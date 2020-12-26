@@ -1,14 +1,13 @@
-﻿using Microsoft.Win32.SafeHandles;
-using System;
-using System.ComponentModel;
-using System.Runtime.ConstrainedExecution;
-using System.Runtime.InteropServices;
-using System.Security;
-using System.Security.Permissions;
-using System.Security.Principal;
-
-namespace PCAFFINITY
+﻿namespace ToolkitCleanup
 {
+    using Microsoft.Win32.SafeHandles;
+    using System;
+    using System.ComponentModel;
+    using System.Runtime.InteropServices;
+    using System.Security;
+    using System.Security.Permissions;
+    using System.Security.Principal;
+
     //https://stackoverflow.com/questions/295538/how-to-provide-user-name-and-password-when-connecting-to-a-network-share/1197430#1197430
     //Pavel Kovalev
 
@@ -21,14 +20,14 @@ namespace PCAFFINITY
             {
                 const int LOGON32_PROVIDER_DEFAULT = 0;
                 const int LOGON32_LOGON_INTERACTIVE = 2;
-                bool returnValue = LogonUser(userName, domainName, userPassword,
+                bool returnValue = NativeMethods.LogonUser(userName, domainName, userPassword,
                     LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT,
                     out SafeTokenHandle safeTokenHandle);
 
                 if (!returnValue)
                 {
                     int ret = Marshal.GetLastWin32Error();
-                    throw new System.ComponentModel.Win32Exception(ret);
+                    throw new Win32Exception(ret);
                 }
 
                 using (safeTokenHandle)
@@ -43,10 +42,6 @@ namespace PCAFFINITY
                 throw;
             }
         }
-
-        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern bool LogonUser(string lpszUsername, string lpszDomain, string lpszPassword,
-            int dwLogonType, int dwLogonProvider, out SafeTokenHandle phToken);
     }
 
     public sealed class ImpersonationContext
@@ -98,7 +93,7 @@ namespace PCAFFINITY
             }
 
             _token = IntPtr.Zero;
-            bool logonSuccessfull = LogonUser(_username, _domain, _password, LogonType.NewCredentials, LogonProvider.WinNT50, ref _token);
+            bool logonSuccessfull = NativeMethods.LogonUser(_username, _domain, _password, LogonType.NewCredentials, LogonProvider.WinNT50, ref _token);
             if (!logonSuccessfull)
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -120,18 +115,11 @@ namespace PCAFFINITY
 
             if (_token != IntPtr.Zero)
             {
-                CloseHandle(_token);
+                NativeMethods.CloseHandle(_token);
             }
 
             _context = null;
         }
-
-        [DllImport("kernel32.dll")]
-        private extern static bool CloseHandle(IntPtr handle);
-
-        [DllImport("advapi32.dll", EntryPoint = "LogonUserW", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern bool LogonUser(string lpszUsername, string lpszDomain,
-        string lpszPassword, LogonType dwLogonType, LogonProvider dwLogonProvider, ref IntPtr phToken);
     }
 
     public sealed class SafeTokenHandle : SafeHandleZeroOrMinusOneIsInvalid
@@ -143,13 +131,7 @@ namespace PCAFFINITY
 
         protected override bool ReleaseHandle()
         {
-            return CloseHandle(handle);
+            return NativeMethods.CloseHandle(handle);
         }
-
-        [DllImport("kernel32.dll")]
-        [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
-        [SuppressUnmanagedCodeSecurity]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(IntPtr handle);
     }
 }

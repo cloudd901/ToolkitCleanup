@@ -1,14 +1,13 @@
-﻿namespace PCAFFINITY
+﻿namespace ToolkitCleanup
 {
-    using FMOLAssistant;
     using Microsoft.Win32;
+    using PCAFFINITY;
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.IO;
     using System.Linq;
     using System.Management;
-    using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
 
@@ -16,7 +15,7 @@
     {
         public static bool Automate;
         public static int CleanType;
-        public static string Computer = null;
+        public static string Computer;
         public static string[] Creds = new string[2] { null, null };
 
         public static string[] FolderListUser = new string[]
@@ -404,10 +403,6 @@
             return profiles;
         }
 
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool RemoveDirectory(string path);
-
         public static int RemoveUserProfile(string sid, string user, string pc = null, bool ask = true)
         {
             int response = 0;
@@ -599,12 +594,7 @@
             List<string> folders = new List<string>();
             FindAllFiles(di, ref files, ref folders);
 
-            //int cnt = files.Count;
-            //int i;
-            //int perc = 0;
-            //int stars = perc / 5;
             float totalMB = 0;
-            //float cleanedMB = 0;
             foreach (Tuple<string, long> file in files)
             {
                 totalMB += file.Item2;
@@ -648,7 +638,6 @@
             t.IsBackground = false;
             t.Join();
             Console.Write("\rRemoving Remaining Files/Folders......Complete");
-            //Console.Write($"\r\n - Time:{sw.ElapsedMilliseconds / 1000}s");
             Console.Write("\r\n");
             return !di.Exists;
         }
@@ -709,10 +698,6 @@
 
             return s;
         }
-
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool DeleteFile(string lpFileName);
 
         private static void FolderProfileCleanup()
         {
@@ -1207,159 +1192,6 @@
             Console.ReadKey();
         }
 
-        private static int RepairUserDirectory()
-        {
-            List<string[]> folderList = new List<string[]>();
-            Console.WriteLine($"\r\nGathering User Temp Folder information for {Computer}.");
-            Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
-            t.Start();
-
-            Dictionary<string, string> comparisons = new Dictionary<string, string>();
-
-            Dictionary<string, string> allUserKeys = new Dictionary<string, string>();
-            List<string> allUserFolders = new List<string>();
-
-            DirectoryInfo[] userDirectories = null;
-            DirectoryInfo directoryInfo = new DirectoryInfo(@$"\\{Computer}\c$\Users\");
-            if (directoryInfo.Exists)
-            {
-                userDirectories = directoryInfo.GetDirectories();
-            }
-
-            const string profileListKey = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\";
-            RegistryCommands regProfileList = new RegistryCommands(RegistryView.Registry64, Registry.LocalMachine, profileListKey, false, Computer);
-            string[] userRegistries = regProfileList.GetAllSubKeys();
-
-            t.IsBackground = false;
-            t.Join();
-
-            foreach (DirectoryInfo di in userDirectories)
-            {
-                if (di.Name == "Temp" || di.Name == "Public" || di.Name == "Administrator" || di.Name.StartsWith("Default") || di.Name.StartsWith("All"))
-                {
-                    continue;
-                }
-
-                allUserFolders.Add(di.FullName);
-            }
-
-            foreach (string s in userRegistries)
-            {
-                if (s.Length > 20)
-                {
-                    string imagePath = regProfileList.ReadSubFolderKey(s, "ProfileImagePath");
-                    if (!string.IsNullOrEmpty(imagePath))
-                    {
-                        string profName = new DirectoryInfo(imagePath).Name;
-                        if (profName == "Temp" || profName == "Public" || profName == "Administrator" || profName.StartsWith("Default") || profName.StartsWith("All"))
-                        {
-                            continue;
-                        }
-
-                        allUserKeys.Add(s, imagePath);
-                    }
-                }
-            }
-
-            foreach (string s in allUserFolders)
-            {
-                string cleanedPath = s.Replace($"\\\\{Computer}\\c$", "C:");
-                if (allUserKeys.ContainsValue(cleanedPath))
-                {
-                    comparisons.Add(cleanedPath, allUserKeys.FirstOrDefault(o => o.Value == cleanedPath).Key);
-                }
-                else
-                {
-                    comparisons.Add(cleanedPath, "");
-                }
-            }
-
-            int cnt = 0;
-            foreach (KeyValuePair<string, string> kvp in allUserKeys)
-            {
-                if (!comparisons.ContainsValue(kvp.Key))
-                {
-                    cnt++;
-                    comparisons.Add((cnt+1).ToString(), kvp.Key);
-                }
-            }
-
-            char ans = 'y';
-            Dictionary<string, string> issues = comparisons.Where(o => string.IsNullOrEmpty(o.Value) || o.Key.Length <= 3).ToDictionary(o => o.Key, o => o.Value);
-            if (issues.Count == 0)
-            {
-                Console.WriteLine("\r\n\r\nNo issues found.");
-            }
-            else
-            {
-                Console.WriteLine($"\r\n{issues.Count} issue(s) found.\r\n");
-                if (!Automate)
-                {
-                    foreach (KeyValuePair<string, string> kvp in issues)
-                    {
-                        if (kvp.Key.Length <= 3)
-                        {
-                            Console.WriteLine($"Missing User Folder for key: {kvp.Value} ({allUserKeys.FirstOrDefault(o => o.Key == kvp.Value).Value})");
-                            //Console.WriteLine($"\tKey will be removed.");
-                        }
-                        else if (string.IsNullOrEmpty(kvp.Value))
-                        {
-                            Console.WriteLine($"Missing Registry key for folder: {kvp.Key}");
-                            //Console.WriteLine($"\tFolder will be moved.");
-                        }
-                    }
-                    Console.WriteLine("\r\nFix all issues? (Y/n)");
-                    while (Console.KeyAvailable)
-                    {
-                        Console.ReadKey(false);
-                    }
-                    ans = Console.ReadKey(true).KeyChar;
-                    Console.WriteLine("");
-                }
-            }
-
-            if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
-            {
-                //<User Folder, Registry Key>
-                foreach (KeyValuePair<string, string> kvp in issues)
-                {
-                    Console.WriteLine("Working...");
-                    if (kvp.Key.Length <= 3)
-                    {
-                        RegistryCommands regProfile = new RegistryCommands(RegistryView.Registry64, Registry.LocalMachine, profileListKey+kvp.Value, false, Computer);
-                        bool test = regProfile.DeleteSubKeyTree(false);
-                        Console.WriteLine($"{kvp.Value} - {(test ? "Removed" : "Unable to remove.")}");
-                    }
-                    else if (string.IsNullOrEmpty(kvp.Value))
-                    {
-                        DirectoryInfo di = new DirectoryInfo(kvp.Key);
-                        if (di.Exists)
-                        {
-                            bool test;
-                            try
-                            {
-                                string tempPath = Path.Combine(di.Parent.FullName, "Temp");
-                                if (!Directory.Exists(tempPath))
-                                {
-                                    Directory.CreateDirectory(tempPath);
-                                }
-
-                                di.MoveTo(Path.Combine(tempPath, di.Name ));
-                                test = true;
-                            }
-                            catch
-                            {
-                                test = false;
-                            }
-                            Console.WriteLine($"{Path.Combine(new string[] { di.Parent.Name, "Temp", di.Name })} - {(test ? "Moved to Temp" : "Unable to move.")}");
-                        }
-                    }
-                }
-            }
-
-            return issues.Count;
-        }
-
         private static void MenuLoad()
         {
             char ans;
@@ -1655,7 +1487,7 @@
                 {
                     if (i < folders.Count)
                     {
-                        RemoveDirectory(folders[i]);
+                        NativeMethods.RemoveDirectory(folders[i]);
                     }
                 });
                 LastTask2.Start();
@@ -1672,6 +1504,159 @@
             Console.WriteLine("");
         }
 
+        private static int RepairUserDirectory()
+        {
+            List<string[]> folderList = new List<string[]>();
+            Console.WriteLine($"\r\nGathering User Temp Folder information for {Computer}.");
+            Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
+            t.Start();
+
+            Dictionary<string, string> comparisons = new Dictionary<string, string>();
+
+            Dictionary<string, string> allUserKeys = new Dictionary<string, string>();
+            List<string> allUserFolders = new List<string>();
+
+            DirectoryInfo[] userDirectories = null;
+            DirectoryInfo directoryInfo = new DirectoryInfo(@$"\\{Computer}\c$\Users\");
+            if (directoryInfo.Exists)
+            {
+                userDirectories = directoryInfo.GetDirectories();
+            }
+
+            const string profileListKey = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\";
+            RegistryCommands regProfileList = new RegistryCommands(RegistryView.Registry64, Registry.LocalMachine, profileListKey, false, Computer);
+            string[] userRegistries = regProfileList.GetAllSubKeys();
+
+            t.IsBackground = false;
+            t.Join();
+
+            foreach (DirectoryInfo di in userDirectories)
+            {
+                if (di.Name == "Temp" || di.Name == "Public" || di.Name == "Administrator" || di.Name.StartsWith("Default") || di.Name.StartsWith("All"))
+                {
+                    continue;
+                }
+
+                allUserFolders.Add(di.FullName);
+            }
+
+            foreach (string s in userRegistries)
+            {
+                if (s.Length > 20)
+                {
+                    string imagePath = regProfileList.ReadSubFolderKey(s, "ProfileImagePath");
+                    if (!string.IsNullOrEmpty(imagePath))
+                    {
+                        string profName = new DirectoryInfo(imagePath).Name;
+                        if (profName == "Temp" || profName == "Public" || profName == "Administrator" || profName.StartsWith("Default") || profName.StartsWith("All"))
+                        {
+                            continue;
+                        }
+
+                        allUserKeys.Add(s, imagePath);
+                    }
+                }
+            }
+
+            foreach (string s in allUserFolders)
+            {
+                string cleanedPath = s.Replace($"\\\\{Computer}\\c$", "C:");
+                if (allUserKeys.ContainsValue(cleanedPath))
+                {
+                    comparisons.Add(cleanedPath, allUserKeys.FirstOrDefault(o => o.Value == cleanedPath).Key);
+                }
+                else
+                {
+                    comparisons.Add(cleanedPath, "");
+                }
+            }
+
+            int cnt = 0;
+            foreach (KeyValuePair<string, string> kvp in allUserKeys)
+            {
+                if (!comparisons.ContainsValue(kvp.Key))
+                {
+                    cnt++;
+                    comparisons.Add((cnt + 1).ToString(), kvp.Key);
+                }
+            }
+
+            char ans = 'y';
+            Dictionary<string, string> issues = comparisons.Where(o => string.IsNullOrEmpty(o.Value) || o.Key.Length <= 3).ToDictionary(o => o.Key, o => o.Value);
+            if (issues.Count == 0)
+            {
+                Console.WriteLine("\r\n\r\nNo issues found.");
+            }
+            else
+            {
+                Console.WriteLine($"\r\n{issues.Count} issue(s) found.\r\n");
+                if (!Automate)
+                {
+                    foreach (KeyValuePair<string, string> kvp in issues)
+                    {
+                        if (kvp.Key.Length <= 3)
+                        {
+                            Console.WriteLine($"Missing User Folder for key: {kvp.Value} ({allUserKeys.FirstOrDefault(o => o.Key == kvp.Value).Value})");
+                            //Console.WriteLine($"\tKey will be removed.");
+                        }
+                        else if (string.IsNullOrEmpty(kvp.Value))
+                        {
+                            Console.WriteLine($"Missing Registry key for folder: {kvp.Key}");
+                            //Console.WriteLine($"\tFolder will be moved.");
+                        }
+                    }
+                    Console.WriteLine("\r\nFix all issues? (Y/n)");
+                    while (Console.KeyAvailable)
+                    {
+                        Console.ReadKey(false);
+                    }
+                    ans = Console.ReadKey(true).KeyChar;
+                    Console.WriteLine("");
+                }
+            }
+
+            if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
+            {
+                //<User Folder, Registry Key>
+                foreach (KeyValuePair<string, string> kvp in issues)
+                {
+                    Console.WriteLine("Working...");
+                    if (kvp.Key.Length <= 3)
+                    {
+                        RegistryCommands regProfile = new RegistryCommands(RegistryView.Registry64, Registry.LocalMachine, profileListKey + kvp.Value, false, Computer);
+                        bool test = regProfile.DeleteSubKeyTree(false);
+                        Console.WriteLine($"{kvp.Value} - {(test ? "Removed" : "Unable to remove.")}");
+                    }
+                    else if (string.IsNullOrEmpty(kvp.Value))
+                    {
+                        DirectoryInfo di = new DirectoryInfo(kvp.Key);
+                        if (di.Exists)
+                        {
+                            bool test;
+                            try
+                            {
+                                string tempPath = Path.Combine(di.Parent.FullName, "Temp");
+                                if (!Directory.Exists(tempPath))
+                                {
+                                    Directory.CreateDirectory(tempPath);
+                                }
+
+                                di.MoveTo(Path.Combine(tempPath, di.Name));
+                                test = true;
+                            }
+                            catch
+                            {
+                                test = false;
+                            }
+                            Console.WriteLine($"{Path.Combine(new string[] { di.Parent.Name, "Temp", di.Name })} - {(test ? "Moved to Temp" : "Unable to move.")}");
+                        }
+                    }
+                }
+            }
+
+            return issues.Count;
+        }
+
         private static long TryDeleteFile(string file, long sizeReturn)
         {
             if (string.IsNullOrWhiteSpace(file) || sizeReturn < 0)
@@ -1679,7 +1664,7 @@
                 return -1;
             }
 
-            bool test = DeleteFile(file);
+            bool test = NativeMethods.DeleteFile(file);
             if (!test)
             {
                 try

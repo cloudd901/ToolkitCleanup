@@ -58,9 +58,13 @@
     <ApplicationIcon>logo.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>PCAFFINITY.Program</StartupObject>
+    <StartupObject>
+    </StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="PCA_RegistryCommands">
+      <HintPath>..\..\PCA_RegistryCommands\RegistryCommands\bin\Release\PCA_RegistryCommands.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.DirectoryServices.AccountManagement" />
@@ -73,20 +77,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\FMOL Assistant %28new%29\FMOL Assistant\Additional Classes\Overrides\StringExtensions.cs">
-      <Link>Additional Classes\StringExtensions.cs</Link>
-    </Compile>
-    <Compile Include="..\..\FMOL Assistant %28new%29\FMOL Assistant\Additional Classes\Tools\CryptoTools.cs">
-      <Link>Additional Classes\CryptoTools.cs</Link>
-    </Compile>
-    <Compile Include="..\..\FMOL Assistant %28new%29\FMOL Assistant\Additional Classes\Tools\PCTools.cs">
-      <Link>Additional Classes\PCTools.cs</Link>
-    </Compile>
-    <Compile Include="..\..\PCA_RegistryCommands\RegistryCommands\RegistryCommands.cs">
-      <Link>Additional Classes\RegistryCommands.cs</Link>
-    </Compile>
-    <Compile Include="Additional Classes\ADTools.cs" />
-    <Compile Include="NetworkConnection.cs" />
+    <Compile Include="Modified Assistant Classes\CryptoTools.cs" />
+    <Compile Include="Modified Assistant Classes\StringExtensions.cs" />
+    <Compile Include="Modified Assistant Classes\NativeMethods.cs" />
+    <Compile Include="Modified Assistant Classes\NetworkConnection.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
