@@ -8,6 +8,8 @@
 
     public static class Crypto
     {
+        // Salt can be set to anything.
+        // Example string entered below.
         private static readonly byte[] _Salt = Encoding.ASCII.GetBytes("p6806642kbM7c5");
 
         /// <summary>
