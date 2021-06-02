@@ -8,6 +8,7 @@
     using System.IO;
     using System.Linq;
     using System.Management;
+    using System.Reflection;
     using System.Threading;
     using System.Threading.Tasks;
 
@@ -16,9 +17,14 @@
         public static bool Automate;
         public static int CleanType;
         public static string Computer;
-        public static string[] Creds = new string[2] { null, null };
 
-        public static string[] FolderListUser = new string[]
+        public static string[] Creds = new string[2]
+        {
+            null,
+            null
+        };
+
+        public static string[] FolderListUser = new string[31]
         {
             @"C:\Users\<USERNAME>\AppData\Roaming\Microsoft\Teams\tmp\*",
             @"C:\Users\<USERNAME>\AppData\Roaming\Microsoft\Teams\blob_storage\*",
@@ -53,7 +59,7 @@
             @"C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\ShaderCache\*"
         };
 
-        public static string[] FolderListWin = new string[]
+        public static string[] FolderListWin = new string[16]
         {
             @"C:\temp\*",
             @"C:\Windows\Downloaded Program Files\*",
@@ -75,9 +81,12 @@
 
         public static bool Individual;
         public static int MaxAgeMonths = 2;
+        public static ProfileCompareType ProfileCompare = ProfileCompareType.NTUserWithDesktopAndAPPData;
         public static int TotalFileThreads = 15;
         public static int TotalFolderThreads = 5;
         public static float TotalMB;
+
+        #region Console Text
 
         public static string[] CredentialPrompt()
         {
@@ -128,38 +137,1093 @@
             return new string[2] { user, pass };
         }
 
-        public static void ExecuteCommand(string command, bool wait = false, bool showWindow = false, bool interactable = false, string user = null, string pass = null)
+        public static Thread ThreadSequenceCurrentLineText(string phrase, char repeater, int length)
         {
-            ProcessStartInfo startInfo = new ProcessStartInfo()
+            return new Thread(() =>
             {
-                FileName = "cmd.exe",
-                Arguments = $"{(showWindow && interactable ? "/k" : "/c")} {command}",
-                CreateNoWindow = !showWindow,
-                UseShellExecute = false
-            };
+                int counter = 0;
+                while (Thread.CurrentThread.IsBackground)
+                {
+                    string v = new string(repeater, counter) + new string(' ', length - counter);
+                    Console.Write($"\r{phrase}{v}");
+                    Thread.Sleep(1000);
+                    counter++;
+                    if (counter > length)
+                    {
+                        counter = 0;
+                    }
+                }
+            })
+            { IsBackground = true };
+        }
 
-            if (!string.IsNullOrWhiteSpace(user) && !string.IsNullOrWhiteSpace(pass))
+        private static string CreateStringLimit(string s, int count, bool showEnd)
+        {
+            if (s.Length > count)
             {
-                startInfo.UserName = user;
-                startInfo.PasswordInClearText = pass;
-                startInfo.Domain = Environment.UserDomainName;
+                if (showEnd)
+                {
+                    s = "..." + s.Substring(s.Length - count + 3, count - 3);
+                }
+                else
+                {
+                    s = s.Substring(0, count - 3) + "...";
+                }
             }
 
-            using Process process = new Process { StartInfo = startInfo };
+            return s;
+        }
 
+        private static void Main(string[] args)
+        {
+            Console.SetWindowSize(78, 35);
+            Console.SetBufferSize(78, Console.BufferHeight);
+
+            WriteHeader();
+
+            ImpersonationContext impersonationContext = null;
+
+            if (args.Length > 0)
+            {
+                foreach (string arg in args)
+                {
+                    bool valid = true;
+                    if (arg.Contains("-?", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/?", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        Console.WriteLine("Toolkit Cleanup Help.");
+                        Console.WriteLine("");
+                        Console.WriteLine("Command Line Switches:");
+                        Console.WriteLine("-?");
+                        Console.WriteLine("-Computer:<computername>");
+                        Console.WriteLine("-User:<username>");
+                        Console.WriteLine("-Pass:<password>");
+                        Console.WriteLine("-Clean <cleanType>");
+                        Console.WriteLine("<CleanType>:0 = Main Menu Choices,");
+                        Console.WriteLine("<CleanType>:1 = Full Auto Clean, 2 = Full Prompt Clean, 3 = Old Profile Removal w/Prompt,");
+                        Console.WriteLine("<CleanType>:4 = PC Temp Cleanup, 5 = User Temp Cleanup, 6 = PC & User Temp Cleanup");
+                        Console.WriteLine("<CleanType>:7 = Check & Repair Profile Structure");
+                        Console.WriteLine("");
+                        Console.WriteLine("Example 1: Cleanup all old profiles from current computer.");
+                        Console.WriteLine("ToolkitCleanup.exe -Clean:1");
+                        Console.WriteLine("");
+                        Console.WriteLine("Example 2: Cleanup PC Temp files from remote computer.");
+                        Console.WriteLine("ToolkitCleanup.exe -Computer:computername -Clean:4 -User:myname -Pass:mypass");
+                        Console.WriteLine("");
+                        valid = false;
+                    }
+                    else if (arg.Contains("-Clean", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/Clean", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        try
+                        {
+                            CleanType = int.Parse(arg.Split(':')[1]);
+                        }
+                        catch
+                        {
+                            Console.WriteLine(" - Invalid Clean parameter.");
+                            valid = false;
+                        }
+                    }
+                    else if (arg.Contains("-Computer", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/Computer", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        try
+                        {
+                            Computer = arg.Split(':')[1];
+                        }
+                        catch
+                        {
+                            Console.WriteLine(" - Invalid Computer parameter.");
+                            valid = false;
+                        }
+                    }
+                    else if (arg.Contains("-User", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/User", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        try
+                        {
+                            Creds[0] = arg.Split(':')[1];
+                        }
+                        catch
+                        {
+                            Console.WriteLine(" - Invalid Username parameter.");
+                            valid = false;
+                        }
+                    }
+                    else if (arg.Contains("-Pass", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/Pass", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        try
+                        {
+                            Creds[1] = Crypto.EncryptStringAES(arg.Split(':')[1], Environment.UserName);
+                        }
+                        catch
+                        {
+                            Console.WriteLine(" - Invalid Password parameter.");
+                            valid = false;
+                        }
+                    }
+
+                    if (!valid)
+                    {
+                        Environment.Exit(0);
+                    }
+                }
+            }
+
+            char ans;
+            ConsoleWriter cw = new ConsoleWriter();
+            cw.WriteLineAnimated("Welcome to the Computer Toolkit Cleanup.", 10, ConsoleColor.Green, ConsoleColor.Red);
+            if (Computer == null)
+            {
+                cw.WriteLineAnimated("")
+                    .WriteLineAnimated("Are you cleaning THIS computer? (y/n)", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
+                    .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(true);
+                }
+
+                ans = Console.ReadKey(false).KeyChar;
+                if (char.ToUpperInvariant(ans) == char.ToUpperInvariant('y') || char.IsWhiteSpace(ans))
+                {
+                    Computer = Environment.MachineName;
+                }
+                else
+                {
+                    cw.WriteLineAnimated("")
+                        .WriteLineAnimated("Please enter the computer name.", 25, ConsoleColor.Yellow, ConsoleColor.Blue)
+                        .WriteAnimated($"({Environment.MachineName})", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+                    Computer = Console.ReadLine();
+                    if (string.IsNullOrWhiteSpace(Computer))
+                    {
+                        Computer = Environment.MachineName;
+                    }
+                }
+            }
+
+            if (Computer != Environment.MachineName && !string.IsNullOrWhiteSpace(Creds[0]) && !string.IsNullOrWhiteSpace(Creds[1]))
+            {
+                cw.WriteLineAnimated("")
+                    .WriteLineAnimated("Use alternate credentials? (y/n)", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
+                    .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+                //Console.WriteLine("\r\nUse alternate credentials? (y/n).");
+                //Console.Write("(y):");
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                ans = Console.ReadKey(true).KeyChar;
+                if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
+                {
+                    Creds = CredentialPrompt();
+                    Console.WriteLine("");
+                    impersonationContext = new ImpersonationContext(Environment.UserDomainName, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
+                    impersonationContext?.Enter();
+                    ExecuteCommand($"Net Use \\\\{Computer}\\c$ /user:\"{ Environment.UserDomainName}\\{Creds[0]}\" \"{Crypto.DecryptStringAES(Creds[1], Environment.UserName)}\"", true);
+                }
+                else
+                {
+                    ExecuteCommand($"Net Use \\\\{Computer}\\c$", true);
+                }
+            }
+
+            if (CleanType == 0)
+            {
+                MenuLoad();
+            }
+            else if (CleanType == 1)
+            {
+                Automate = true;
+                FolderTempPCCleanup();
+                FolderProfileCleanup();
+                FolderTempUserCleanup();
+            }
+            else if (CleanType == 2)
+            {
+                Automate = false;
+                FolderTempPCCleanup();
+                FolderProfileCleanup();
+                FolderTempUserCleanup();
+            }
+            else if (CleanType == 3)
+            {
+                Automate = false;
+                FolderProfileCleanup();
+            }
+            else if (CleanType == 4)
+            {
+                Automate = false;
+                FolderTempPCCleanup();
+            }
+            else if (CleanType == 5)
+            {
+                Automate = false;
+                FolderTempUserCleanup();
+            }
+            else if (CleanType == 6)
+            {
+                Automate = false;
+                FolderTempPCCleanup();
+                FolderTempUserCleanup();
+            }
+            else if (CleanType == 7)
+            {
+                Automate = true;
+                RepairUserDirectory();
+            }
+
+            DirectoryInfo tempFolder = new DirectoryInfo(@$"\\{Computer}\c$\Users\Temp");
+            if (tempFolder.Exists && CleanType != 7)
+            {
+                DirectoryInfo[] tdi = tempFolder.GetDirectories("*", SearchOption.TopDirectoryOnly);
+                if (tdi.Length > 0)
+                {
+                    if (CleanType == 0)
+                    {
+                        cw.WriteLineAnimated("")
+                            .WriteLineAnimated("Remaining Temp User Files found. Cleanup Now? (y/n)", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
+                            .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+                        //Console.WriteLine("");
+                        //Console.WriteLine("Remaining Temp User Files found. Cleanup Now? (y/n)");
+                        //Console.Write("(y):");
+                        while (Console.KeyAvailable)
+                        {
+                            Console.ReadKey(false);
+                        }
+
+                        ans = Console.ReadKey(true).KeyChar;
+                    }
+                    else
+                    {
+                        ans = 'y';
+                    }
+
+                    if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
+                    {
+                        bool test = CleanupDirectoryQuick(tempFolder);
+                        if (!test)
+                        {
+                            Console.WriteLine($"Unable to remove all files in {tempFolder.FullName}.");
+                        }
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        tempFolder.Delete();
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+
+            if (Computer != Environment.MachineName && !string.IsNullOrWhiteSpace(Creds[0]) && !string.IsNullOrWhiteSpace(Creds[1]))
+            {
+                ExecuteCommand(@$"Net Use \\{Computer}\c$ /delete", true);
+                impersonationContext?.Leave();
+            }
+
+            if (CleanType != 7)
+            {
+                cw.WriteLineAnimated("")
+                    .WriteAnimated("Cleaned ", 10, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteAnimated($"{TotalMB:n2}MB", 10, ConsoleColor.White, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteLineAnimated(".", 0, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn);
+            }
+
+            cw.WriteLineAnimated("")
+                .WriteLineAnimated("Restart is recommended after cleanings.", 10, ConsoleColor.Red, ConsoleColor.Blue);
+
+            cw.WriteAnimated("Press ", 10, ConsoleColor.Green, ConsoleColor.Blue)
+                .WriteAnimated("Any Key", 10, ConsoleColor.White, ConsoleColor.Blue)
+                .WriteLineAnimated(" to exit.", 10, ConsoleColor.Green, ConsoleColor.Blue);
+
+            //Console.WriteLine("\r\nRestart is recommended after most cleanings.");
+            //Console.WriteLine("Press any key to close.");
+            while (Console.KeyAvailable)
+            {
+                Console.ReadKey(false);
+            }
+
+            Console.ReadKey();
+        }
+
+        private static void MenuLoad(int speed = 4)
+        {
+            char ans;
+            int fixIssues = 0;
+
+            Console.Clear();
+
+            WriteHeader(false, ConsoleColor.DarkBlue);
+
+            using ConsoleWriter cw = new ConsoleWriter();
+            cw.AniTextColorExplicit = ConsoleColor.Green;
+            cw.TextColorExplicit = ConsoleColor.White;
+
+            cw.WriteAnimated($"Toolkit connected to ", speed, ConsoleColor.Green)
+                .WriteAnimated($"{Computer}", speed, ConsoleColor.Yellow)
+                .WriteAnimated($" as ", speed, ConsoleColor.Green)
+                .WriteAnimated($"{(string.IsNullOrWhiteSpace(Creds[0]) ? Environment.UserName : Creds[0])}", speed, ConsoleColor.Yellow)
+                .WriteLineAnimated($".", speed, ConsoleColor.Green)
+
+                .WriteLineAnimated("Please choose an option to clean.", speed)
+                .WriteLineAnimated("", 0)
+                .WriteAnimated("1) - ", speed).WriteLineAnimated("Full cleanup - All options.", speed, ConsoleColor.Blue)
+                .WriteAnimated("2) - ", speed).WriteLineAnimated("Cleanup App/Windows Temporary files.", speed, ConsoleColor.Blue)
+                .WriteAnimated("3) - ", speed).WriteLineAnimated("Remove old User Profiles.", speed, ConsoleColor.Blue)
+                .WriteAnimated("4) - ", speed).WriteLineAnimated("Cleanup User Temporary files.", speed, ConsoleColor.Blue)
+                .WriteLineAnimated("", 0)
+
+                .WriteAnimated("5) - ", speed).WriteLineAnimated("Repair User Directories/Registry Keys.", speed, ConsoleColor.Magenta)
+                .WriteLineAnimated("", 0)
+                .WriteAnimated("6) ", speed).WriteLineAnimated("Modify settings.", speed, ConsoleColor.Yellow)
+
+                .WriteLineAnimated("0) Exit.", speed)
+                .WriteLineAnimated("", 0)
+                .WriteAnimated("(1)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+            while (Console.KeyAvailable)
+            {
+                Console.ReadKey(false);
+            }
+
+            ans = Console.ReadKey(false).KeyChar;
+            Console.Clear();
+            WriteHeader(false, ConsoleColor.DarkBlue);
+            if (ans == '1' || char.IsWhiteSpace(ans))
+            {
+                cw.WriteLineAnimated("")
+                    .WriteLineAnimated("Full cleanup selected. Continue? y/n", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
+                    .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+                //Console.WriteLine("Full cleanup selected. Continue? y/n");
+                //Console.Write("(y):");
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                ans = Console.ReadKey(false).KeyChar;
+                if (char.ToUpperInvariant(ans) == char.ToUpperInvariant('y') || char.IsWhiteSpace(ans))
+                {
+                    Console.Clear();
+                    WriteHeader(false, ConsoleColor.DarkBlue);
+                    FolderTempPCCleanup();
+                    Console.Clear();
+                    WriteHeader(false, ConsoleColor.DarkBlue);
+                    FolderProfileCleanup();
+                    Console.Clear();
+                    WriteHeader(false, ConsoleColor.DarkBlue);
+                    FolderTempUserCleanup();
+                }
+            }
+            else if (ans == '2')
+            {
+                cw.WriteLineAnimated("")
+                    .WriteLineAnimated("App/Windows Temporary files selected. Continue? y/n", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
+                    .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+                //Console.WriteLine("App/Windows Temporary files selected. Continue? y/n");
+                //Console.Write("(y):");
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                ans = Console.ReadKey(false).KeyChar;
+                if (char.ToUpperInvariant(ans) == char.ToUpperInvariant('y') || char.IsWhiteSpace(ans))
+                {
+                    Console.Clear();
+                    WriteHeader(false, ConsoleColor.DarkBlue);
+                    FolderTempPCCleanup();
+                }
+            }
+            else if (ans == '3')
+            {
+                cw.WriteLineAnimated("")
+                    .WriteLineAnimated("Remove old User Profiles selected. Continue? y/n", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
+                    .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+                //Console.WriteLine("Remove old User Profiles selected. Continue? y/n");
+                //Console.Write("(y):");
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                ans = Console.ReadKey(false).KeyChar;
+                if (char.ToUpperInvariant(ans) == char.ToUpperInvariant('y') || char.IsWhiteSpace(ans))
+                {
+                    Console.Clear();
+                    WriteHeader(false, ConsoleColor.DarkBlue);
+                    FolderProfileCleanup();
+                }
+            }
+            else if (ans == '4')
+            {
+                cw.WriteLineAnimated("")
+                    .WriteLineAnimated("Cleanup User Temporary files selected. Continue? y/n", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
+                    .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+                //Console.WriteLine("Cleanup User Temporary files selected. Continue? y/n");
+                //Console.Write("(y):");
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                ans = Console.ReadKey(false).KeyChar;
+                if (char.ToUpperInvariant(ans) == char.ToUpperInvariant('y') || char.IsWhiteSpace(ans))
+                {
+                    Console.Clear();
+                    WriteHeader(false, ConsoleColor.DarkBlue);
+                    FolderTempUserCleanup();
+                }
+            }
+            else if (ans == '5')
+            {
+                Console.Clear();
+                WriteHeader(false, ConsoleColor.DarkMagenta);
+                fixIssues = RepairUserDirectory();
+            }
+            else if (ans == '0')
+            {
+                return;
+            }
+            else if (ans == '6')
+            {
+                MenuSettings();
+            }
+
+            if (ans == '5')
+            {
+                cw.WriteLineAnimated("", 0);
+
+                cw.WriteAnimated("Repair Complete. Attempted to fix ", 25, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteAnimated(fixIssues.ToString(), 5, ConsoleColor.White, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteLineAnimated(" issues.", 5, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn);
+
+                cw.WriteAnimated("Press ", 5, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteAnimated("Any Key", 5, ConsoleColor.White, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteLineAnimated(" to return to menu.", 10, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn);
+
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                Console.ReadKey(true);
+            }
+            else if (ans != '6' && char.ToUpperInvariant(ans) != char.ToUpperInvariant('n'))
+            {
+                cw.WriteLineAnimated("", 0);
+
+                cw.WriteAnimated("Cleaning Complete. Total cleaned this session: ", 25, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteLineAnimated($"{TotalMB:n2}MB", 5, ConsoleColor.White, ConsoleColor.Blue, AnimationType.SlideIn);
+
+                cw.WriteAnimated("Press ", 5, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteAnimated("Any Key", 5, ConsoleColor.White, ConsoleColor.Blue, AnimationType.SlideIn)
+                    .WriteLineAnimated(" to return to menu.", 10, ConsoleColor.Green, ConsoleColor.Blue, AnimationType.SlideIn);
+
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                Console.ReadKey(true);
+            }
+
+            MenuLoad();
+        }
+
+        private static void MenuSettings(int speed = 4)
+        {
+            char ans;
+
+            Console.Clear();
+
+            WriteHeader(false, ConsoleColor.DarkMagenta);
+
+            using ConsoleWriter cw = new ConsoleWriter();
+            cw.AniTextColorExplicit = ConsoleColor.Green;
+            cw.TextColorExplicit = ConsoleColor.White;
+
+            cw.WriteAnimated("User Profile max age is set to [", speed)
+                .WriteAnimated(MaxAgeMonths.ToString(), 0, ConsoleColor.Yellow)
+                .WriteLineAnimated("] months.", speed);
+            cw.WriteAnimated("User Profile max age gathered using [", speed)
+                .WriteAnimated(ProfileCompareToString(ProfileCompare), 0, ConsoleColor.Yellow)
+                .WriteLineAnimated("].", speed);
+            cw.WriteAnimated("File Delete thread count set to [", speed)
+                .WriteAnimated(TotalFileThreads.ToString(), 0, ConsoleColor.Yellow)
+                .WriteLineAnimated("] threads.", speed);
+            cw.WriteAnimated("Folder Delete thread count set to [", speed)
+                .WriteAnimated(TotalFolderThreads.ToString(), 0, ConsoleColor.Yellow)
+                .WriteLineAnimated("] threads.", speed);
+            cw.WriteAnimated("Automation - Cleaning [", speed)
+                .WriteAnimated($"WILL", 0, ConsoleColor.Yellow)
+                .WriteAnimated(Automate ? " NOT" : "", 0, ConsoleColor.Red)
+                .WriteLineAnimated("] prompt for input.", speed);
+
+            cw.WriteLineAnimated("", 0)
+                .WriteAnimated("1) ", speed).WriteLineAnimated("Change Max Profile Age.", speed, ConsoleColor.Green)
+                .WriteAnimated("2) ", speed).WriteLineAnimated("Change how Max Profile Age is gathered.", speed, ConsoleColor.Green)
+                .WriteLineAnimated("", 0)
+                .WriteAnimated("3) ", speed).WriteLineAnimated("Change File Threads.", speed, ConsoleColor.Green)
+                .WriteAnimated("4) ", speed).WriteLineAnimated("Change Folder Threads.", speed, ConsoleColor.Green)
+                .WriteLineAnimated("", 0)
+                .WriteAnimated("5) ", speed).WriteLineAnimated("Toggle automation setting.", speed, ConsoleColor.Green)
+                .WriteLineAnimated("", 0)
+                .WriteAnimated("6) ", speed).WriteLineAnimated("Modify locations to clean. (Not Implemented)", speed, ConsoleColor.Green)
+                .WriteLineAnimated("", 0)
+                .WriteLineAnimated("0) Return.", speed)
+                .WriteLineAnimated("", 0)
+                .WriteAnimated("(0)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+
+            while (Console.KeyAvailable)
+            {
+                Console.ReadKey(false);
+            }
+
+            ans = Console.ReadKey(false).KeyChar;
+            if (string.Equals(ans.ToString(), "0") || char.IsWhiteSpace(ans))
+            {
+                return;
+            }
+            else if (string.Equals(ans.ToString(), "1"))
+            {
+                cw.WriteLineAnimated("", 0)
+                    .WriteLineAnimated("", 0)
+                    .WriteLineAnimated("Set the max age of User Profiles to keep:", 5, ConsoleColor.Blue)
+                    .WriteAnimated("(2)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                string threads = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(threads))
+                {
+                    threads = "2";
+                }
+
+                if (int.TryParse(threads, out int newAge))
+                {
+                    MaxAgeMonths = newAge;
+                    cw.WriteLineAnimated("", 0)
+                    .WriteAnimated("Max age set to ", 5, ConsoleColor.Blue)
+                    .WriteAnimated(MaxAgeMonths.ToString(), 5, ConsoleColor.Yellow)
+                    .WriteLineAnimated(" months.", 5, ConsoleColor.Blue);
+                    Thread.Sleep(1200);
+                }
+                else
+                {
+                    cw.WriteLineAnimated("", 0)
+                    .WriteAnimated("Number was invalid. Continuing with current max age. ", 5, ConsoleColor.Blue)
+                    .WriteAnimated(MaxAgeMonths.ToString(), 5, ConsoleColor.Yellow)
+                    .WriteLineAnimated(" months.", 5, ConsoleColor.Blue);
+                    Thread.Sleep(1200);
+                }
+            }
+            else if (string.Equals(ans.ToString(), "2"))
+            {
+                cw.WriteLineAnimated("", 0)
+                    .WriteLineAnimated("", 0)
+                    .WriteLineAnimated("Set how max age of User Profiles is determined:", 5, ConsoleColor.Blue)
+                    .WriteLineAnimated("", 0)
+                    .WriteAnimated("1) ", 0).WriteLineAnimated(ProfileCompareToString(ProfileCompareType.NTUserWithDesktopAndAPPData), 5, ConsoleColor.Blue)
+                    .WriteAnimated("2) ", 0).WriteLineAnimated(ProfileCompareToString(ProfileCompareType.NTUser), 5, ConsoleColor.Blue)
+                    .WriteAnimated("3) ", 0).WriteLineAnimated(ProfileCompareToString(ProfileCompareType.DesktopOnly), 5, ConsoleColor.Blue)
+                    .WriteAnimated("(1)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                ans = Console.ReadKey(false).KeyChar;
+                if (ans == '1' || char.IsWhiteSpace(ans))
+                {
+                    ProfileCompare = ProfileCompareType.NTUserWithDesktopAndAPPData;
+                }
+                else if (ans == '2')
+                {
+                    ProfileCompare = ProfileCompareType.NTUser;
+                }
+                else if (ans == '3')
+                {
+                    ProfileCompare = ProfileCompareType.DesktopOnly;
+                }
+
+                cw.WriteLineAnimated("", 0)
+                    .WriteLineAnimated("", 0)
+                    .WriteAnimated("User Profiles is determined using ", 5, ConsoleColor.Blue)
+                    .WriteAnimated(ProfileCompareToString(ProfileCompare), 5, ConsoleColor.Yellow)
+                    .WriteLineAnimated(".", 5, ConsoleColor.Blue);
+                Thread.Sleep(1200);
+            }
+            else if (string.Equals(ans.ToString(), "3"))
+            {
+                cw.WriteLineAnimated("", 0)
+                    .WriteLineAnimated("", 0)
+                    .WriteLineAnimated("Set the number of File Delete threads:", 5, ConsoleColor.Blue)
+                    .WriteAnimated("(15)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                string threads = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(threads))
+                {
+                    threads = "15";
+                }
+
+                if (int.TryParse(threads, out int newThreads))
+                {
+                    TotalFileThreads = newThreads;
+                    cw.WriteLineAnimated("", 0)
+                        .WriteAnimated("File thread count set to ", 5, ConsoleColor.Blue)
+                        .WriteAnimated(TotalFileThreads.ToString(), 5, ConsoleColor.Yellow)
+                        .WriteLineAnimated(".", 5, ConsoleColor.Blue);
+                    Thread.Sleep(1200);
+                }
+                else
+                {
+                    cw.WriteLineAnimated("", 0)
+                        .WriteAnimated("Number was invalid. Continuing with default File thread count. (", 5, ConsoleColor.Blue)
+                        .WriteAnimated(TotalFileThreads.ToString(), 5, ConsoleColor.Yellow)
+                        .WriteLineAnimated(")", 5, ConsoleColor.Blue);
+                    Thread.Sleep(1200);
+                }
+            }
+            else if (string.Equals(ans.ToString(), "4"))
+            {
+                cw.WriteLineAnimated("", 0)
+                    .WriteLineAnimated("", 0)
+                    .WriteLineAnimated("Set the number of Folder Delete threads:", 5, ConsoleColor.Blue)
+                    .WriteAnimated("(5)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(false);
+                }
+
+                string threads = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(threads))
+                {
+                    threads = "5";
+                }
+
+                if (int.TryParse(threads, out int newThreads))
+                {
+                    TotalFolderThreads = newThreads;
+                    cw.WriteLineAnimated("", 0)
+                        .WriteAnimated("Folder thread count set to ", 5, ConsoleColor.Blue)
+                        .WriteAnimated(TotalFolderThreads.ToString(), 5, ConsoleColor.Yellow)
+                        .WriteLineAnimated(".", 5, ConsoleColor.Blue);
+                    Thread.Sleep(1200);
+                }
+                else
+                {
+                    cw.WriteLineAnimated("", 0)
+                        .WriteAnimated("Number was invalid. Continuing with default Folder thread count. (", 5, ConsoleColor.Blue)
+                        .WriteAnimated(TotalFolderThreads.ToString(), 5, ConsoleColor.Yellow)
+                        .WriteLineAnimated(")", 5, ConsoleColor.Blue);
+                    Thread.Sleep(1200);
+                }
+            }
+            else if (string.Equals(ans.ToString(), "5"))
+            {
+                Automate = !Automate;
+            }
+            else if (string.Equals(ans.ToString(), "6"))
+            {
+            }
+
+            MenuSettings(0);
+        }
+
+        private static string ProfileCompareToString(ProfileCompareType type)
+        {
+            string profdate = "";
+
+            if (type == ProfileCompareType.DesktopOnly)
+            {
+                profdate = "Desktop(LastWrite)";
+            }
+            else if (type == ProfileCompareType.NTUser)
+            {
+                profdate = "NTUser.DAT";
+            }
+            else if (type == ProfileCompareType.NTUserWithDesktopAndAPPData)
+            {
+                profdate = "NTUser.DAT/Desktop/AppData";
+            }
+
+            return profdate;
+        }
+
+        private static void WriteHeader(bool animate = true, ConsoleColor backgroundColor = ConsoleColor.DarkMagenta)
+        {
+            using ConsoleWriter cw = new ConsoleWriter();
+            cw.BackgroundColor = backgroundColor;
+            cw.GarbledCharacterString = "#";
+
+            string appname = "Toolkit Cleanup";
+            string byname = " - by Derrick Ducote";
+            string v = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            ConsoleColor mainColor = ConsoleColor.White;
+            ConsoleColor titlecolor = ConsoleColor.Yellow;
+
+            cw.WriteAnimated(appname, animate ? 70 : 0, titlecolor, ConsoleColor.Black, AnimationType.GarbledRandom)
+                .WriteLineAnimated(byname, animate ? 50 : 0, mainColor, ConsoleColor.Black, AnimationType.Linear);
+
+            cw.WriteAnimated("Version - ", animate ? 80 : 0, titlecolor, ConsoleColor.Black, AnimationType.GarbledRandom)
+                .WriteLineAnimated(v, animate ? 60 : 0, mainColor, ConsoleColor.Black, AnimationType.Linear);
+
+            Console.WriteLine("");
+        }
+
+        #endregion Console Text
+
+        #region Cleanup Methods
+
+        private static bool CleanupDirectoryDetailed(DirectoryInfo di)
+        {
+            Stopwatch sw = new Stopwatch();
+
+            Console.Write("Gathering Folder Info");
+            Thread t = ThreadSequenceCurrentLineText("Gathering Folder Info", '.', 6);
+            t.Start();
+
+            sw.Start();
+            List<Tuple<string, long>> files = new List<Tuple<string, long>>();
+            List<string> folders = new List<string>();
+            FindAllFiles(di, ref files, ref folders);
+
+            float totalMB = 0;
+            foreach (Tuple<string, long> file in files)
+            {
+                totalMB += file.Item2;
+            }
+
+            totalMB = totalMB / 1024f / 1024f;
+            t.IsBackground = false;
+            t.Join();
+            Console.Write("\rGathering Folder Info......Complete\r\n");
+            Console.WriteLine($"- Time:{sw.ElapsedMilliseconds / 1000}s - FileCnt:{files.Count} - DirCnt:{folders.Count} - {totalMB:n2}MB");
+
+            sw.Restart();
+            Removing(files, folders);
+
+            Console.Write("\r\n");
+            t = ThreadSequenceCurrentLineText("Removing Remaining Files/Folders", '.', 6);
+            t.Start();
             try
             {
-                process.Start();
-                if (wait)
-                {
-                    process.WaitForExit();
-                }
+                ExecuteCommand($"del /f/s/q foldername {di.FullName} > nul", true);
+                ExecuteCommand($"rmdir /s/q {di.FullName}", true);
             }
             catch
             {
-                throw;
+                if (di.Exists)
+                {
+                    try
+                    {
+                        Thread.Sleep(100);
+                        ExecuteCommand($"rmdir /s /q {di.FullName}", true, false, false, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
+                        Thread.Sleep(100);
+                    }
+                    catch
+                    {
+                        Console.Write("\r\n");
+                        Console.WriteLine($"Unable to remove Temp directory. \"{di.FullName}\"");
+                        return false;
+                    }
+                }
+            }
+            t.IsBackground = false;
+            t.Join();
+            Console.Write("\rRemoving Remaining Files/Folders......Complete");
+            Console.Write("\r\n");
+            return !di.Exists;
+        }
+
+        private static bool CleanupDirectoryQuick(DirectoryInfo di)
+        {
+            Stopwatch sw = new Stopwatch();
+            sw.Restart();
+
+            Thread t = ThreadSequenceCurrentLineText("Removing Remaining Files/Folders", '.', 6);
+            t.Start();
+            try
+            {
+                ExecuteCommand($"del /f/s/q foldername {di.FullName} > nul", true);
+                Thread.Sleep(100);
+                ExecuteCommand($"rmdir /s/q {di.FullName}", true);
+                Thread.Sleep(100);
+            }
+            catch
+            {
+                if (di.Exists)
+                {
+                    try
+                    {
+                        Thread.Sleep(100);
+                        ExecuteCommand($"rmdir /s/q {di.FullName}", true, false, false, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
+                        Thread.Sleep(100);
+                    }
+                    catch
+                    {
+                        Console.Write("\r\n");
+                        Console.WriteLine($"Unable to remove Temp directory. \"{di.FullName}\"");
+                        return false;
+                    }
+                }
+            }
+            t.IsBackground = false;
+            t.Join();
+            Console.Write("\rRemoving Remaining Files/Folders......Complete");
+            Console.Write($"\r\n - Time:{sw.ElapsedMilliseconds / 1000}s");
+            Console.Write("\r\n");
+            return !di.Exists;
+        }
+
+        private static void FolderProfileCleanup()
+        {
+            char ans;
+            string profdate = ProfileCompareToString(ProfileCompare);
+
+            Console.WriteLine($"\r\nGathering User Profile information for {Computer}");
+            Console.WriteLine($"Settings: MaxAgeMonths={MaxAgeMonths} ProfileDateCheck:{profdate}");
+            Console.Write("Working");
+            Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
+            t.Start();
+            string[][][] list = GetProfileInfoDat(Computer, MaxAgeMonths, ProfileCompare, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
+            t.IsBackground = false;
+            t.Join();
+            Console.WriteLine("");
+            Console.WriteLine("-----------------------SID---------------------|--User--|--LastProfileUpdate--");
+            Console.WriteLine("------- Keep");
+            foreach (string[] l in list[0])
+            {
+                Console.WriteLine(string.Join("|", l));
+            }
+            Console.WriteLine("------- Remove");
+            foreach (string[] l in list[1])
+            {
+                Console.WriteLine(string.Join("|", l));
+            }
+            Console.WriteLine("");
+            if (list[1].Length > 0)
+            {
+                if (Automate)
+                {
+                    Individual = false;
+                    Console.WriteLine("-------------------------------------");
+                    Console.WriteLine("Press Esc to stop after current job is complete.");
+                    Console.WriteLine("-------------------------------------\r\n");
+                    foreach (string[] l in list[1])
+                    {
+                        int response = RemoveUserProfile(l[0], l[1], Computer != Environment.MachineName ? Computer : null, Individual);
+                        if (response == -1)
+                        {
+                            Console.WriteLine("Stop Cleaning User Profiles? (Y/n)");
+                            while (Console.KeyAvailable)
+                            {
+                                Console.ReadKey(false);
+                            }
+                            ans = Console.ReadKey(true).KeyChar;
+                            if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
+                            {
+                                Console.WriteLine("\r\nStopping.\r\n");
+                                break;
+                            }
+                        }
+                        else if (response == -2)
+                        {
+                            Console.WriteLine("\r\nProfile Skipped.\r\n");
+                        }
+                        else if (response == 0)
+                        {
+                            Console.WriteLine("\r\nFailed to Remove Profile.\r\n");
+                        }
+                        else if (response == 1)
+                        {
+                            Console.WriteLine("\r\nProfile Removed.\r\n");
+                        }
+                    }
+
+                    Console.WriteLine("User cleanup completed.");
+                }
+                else
+                {
+                    Console.WriteLine($"Ready to remove {list[1].Length} accounts older than {MaxAgeMonths} months? (Y/n).");
+                    while (Console.KeyAvailable)
+                    {
+                        Console.ReadKey(false);
+                    }
+                    ans = Console.ReadKey(true).KeyChar;
+                    if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
+                    {
+                        Console.WriteLine("Individually prompt to remove each profile? (Y/n).");
+                        while (Console.KeyAvailable)
+                        {
+                            Console.ReadKey(false);
+                        }
+                        ans = Console.ReadKey(true).KeyChar;
+                        if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
+                        {
+                            Individual = true;
+                        }
+
+                        Console.Clear();
+
+                        if (!Individual)
+                        {
+                            Console.WriteLine("Press Esc to stop after current job is complete.\r\n");
+                        }
+
+                        foreach (string[] l in list[1])
+                        {
+                            int response = RemoveUserProfile(l[0], l[1], Computer != Environment.MachineName ? Computer : null, Individual);
+                            if (response == -1)
+                            {
+                                Console.WriteLine("Stop Cleaning User Profiles? (Y/n)");
+                                while (Console.KeyAvailable)
+                                {
+                                    Console.ReadKey(false);
+                                }
+                                ans = Console.ReadKey(true).KeyChar;
+                                if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
+                                {
+                                    Console.WriteLine("\r\nStopping.\r\n");
+                                    break;
+                                }
+                            }
+                            else if (response == -2)
+                            {
+                                Console.WriteLine("\r\nProfile Skipped.\r\n");
+                            }
+                            else if (response == 0)
+                            {
+                                Console.WriteLine("\r\nFailed to Remove Profile.\r\n");
+                            }
+                            else if (response == 1)
+                            {
+                                Console.WriteLine("\r\nProfile Removed.\r\n");
+                            }
+                        }
+
+                        Console.WriteLine("User cleanup completed.");
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No accounts older than {MaxAgeMonths} months.");
             }
         }
+
+        private static void FolderTempPCCleanup()
+        {
+            List<string[]> folderList = new List<string[]>();
+            Console.WriteLine($"\r\nGathering temp file list for {Computer}.");
+            Console.Write("Working");
+            Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
+            t.Start();
+            GetExistingFolders(Computer, "", FolderListWin, ref folderList);
+            List<Tuple<string, long>> files = new List<Tuple<string, long>>();
+            List<string> folders = new List<string>();
+            foreach (string[] directory in folderList)
+            {
+                FindAllFiles(new DirectoryInfo(directory[0]), ref files, ref folders, directory[1]);
+            }
+            t.IsBackground = false;
+            t.Join();
+
+            foreach (string s in FolderListWin)
+            {
+                int index = folders.FindIndex(x => x == s);
+                if (index > 0)
+                {
+                    folders.RemoveAt(index);
+                }
+            }
+
+            Removing(files, folders, !Automate);
+        }
+
+        private static void FolderTempUserCleanup()
+        {
+            List<string[]> folderList = new List<string[]>();
+            //Console.Clear();
+            Console.WriteLine($"\r\nGathering User Temp Folder information for {Computer}.");
+            Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
+            t.Start();
+            string[][][] list = GetProfileInfoDat(Computer, MaxAgeMonths, ProfileCompare, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
+            foreach (string[] l in list[0])
+            {
+                GetExistingFolders(Computer, l[1], FolderListUser, ref folderList);
+            }
+
+            foreach (string[] l in list[1])
+            {
+                GetExistingFolders(Computer, l[1], FolderListUser, ref folderList);
+            }
+
+            t.IsBackground = false;
+            t.Join();
+            Console.Write("\r\nCollecting File data in all user locations.\r\n");
+            Console.Write("Press Escape to cancel.\r\n");
+            List<Tuple<string, long>> files = new List<Tuple<string, long>>();
+            List<string> folders = new List<string>();
+            int cnt = 0;
+            string write1 = "";
+            string write2 = "";
+            foreach (string[] directory in folderList)
+            {
+                cnt++;
+                write1 = $"\r({cnt}/{folderList.Count}) {CreateStringLimit($"{directory[0]}\\{directory[1]}", 55, true)}";
+                write2 = "";
+                if (write1.Length < 66)
+                {
+                    write2 = new string(' ', 66 - write1.Length);
+                }
+
+                Console.Write(write1 + write2);
+
+                while (Console.KeyAvailable)
+                {
+                    ConsoleKeyInfo key = Console.ReadKey(false);
+                    if (key.Key == ConsoleKey.Escape)
+                    {
+                        return;
+                    }
+                }
+
+                FindAllFiles(new DirectoryInfo(directory[0]), ref files, ref folders, directory[1]);
+            }
+
+            foreach (string s in FolderListUser)
+            {
+                int index = folders.FindIndex(x => x == s);
+                if (index > 0)
+                {
+                    folders.RemoveAt(index);
+                }
+            }
+            Console.WriteLine("\r\nGathering Info......Complete");
+            Removing(files, folders, !Automate);
+        }
+
+        #endregion Cleanup Methods
+
+        #region File/Folder Operations
 
         public static void FindAllFiles(DirectoryInfo rootDirectory, ref List<Tuple<string, long>> fileList, ref List<string> folderList, string fileSearchPattern = "*")
         {
@@ -304,7 +1368,7 @@
             //return new object[2] { fileList, folderList };
         }
 
-        public static string[][][] GetProfileInfoDat(string nameOrAddress, int monthsOld = 2, bool useOnlyNTUSERDAT = false, string username = "", string password = "")
+        public static string[][][] GetProfileInfoDat(string nameOrAddress, int monthsOld = 2, ProfileCompareType profileCompare = ProfileCompareType.NTUserWithDesktopAndAPPData, string username = "", string password = "")
         {
             string[][][] profiles = new string[2][][];
 
@@ -341,26 +1405,22 @@
                         {
                             string[] path = ((string)result["LocalPath"])?.Split('\\');
                             string user = path[path.Length - 1];
-                            DateTime last;
+                            DateTime last = DateTime.MinValue;
 
                             DirectoryInfo directoryInfo = new DirectoryInfo(@$"\\{nameOrAddress}\c$\Users\{user}");
                             if (directoryInfo.Exists)
                             {
-                                if (useOnlyNTUSERDAT)
+                                if (profileCompare == ProfileCompareType.NTUser)
                                 {
                                     FileInfo fileInfo = new FileInfo(@$"\\{nameOrAddress}\c$\Users\{user}\NTUser.DAT");
                                     DateTime last0 = fileInfo.LastWriteTime;
                                     DateTime last1 = fileInfo.LastAccessTime;
                                     last = last0.CompareTo(last1) < 0 ? last1 : last0;
                                 }
-                                else
+                                else if (profileCompare == ProfileCompareType.NTUserWithDesktopAndAPPData)
                                 {
                                     FileInfo ntFile1 = new FileInfo(@$"\\{nameOrAddress}\c$\Users\{user}\NTUSER.DAT");
-                                    if (!ntFile1.Exists)
-                                    {
-                                        last = DateTime.MinValue;
-                                    }
-                                    else
+                                    if (ntFile1.Exists)
                                     {
                                         DateTime last00 = ntFile1.LastWriteTime;
                                         DateTime last01 = ntFile1.LastAccessTime;
@@ -378,6 +1438,17 @@
                                             last = last.CompareTo(last3) < 0 ? last3 : last;
                                         }
                                     }
+                                }
+                                else if (profileCompare == ProfileCompareType.DesktopOnly)
+                                {
+                                    DirectoryInfo directoryInfo2 = new DirectoryInfo(@$"\\{nameOrAddress}\c$\Users\{user}\Desktop");
+                                    FileInfo fileInfo = new FileInfo(@$"\\{nameOrAddress}\c$\Users\{user}\Desktop\desktop.ini");
+                                    DateTime last0 = fileInfo.LastWriteTime;
+                                    DateTime last2 = directoryInfo.LastWriteTime;
+                                    DateTime last3 = directoryInfo2.LastWriteTime;
+                                    last = last0;
+                                    last = last.CompareTo(last2) < 0 ? last2 : last;
+                                    last = last.CompareTo(last3) < 0 ? last3 : last;
                                 }
 
                                 if (last.AddMonths(monthsOld).CompareTo(DateTime.Now) >= 0)
@@ -561,371 +1632,6 @@
             }
         }
 
-        public static Thread ThreadSequenceCurrentLineText(string phrase, char repeater, int length)
-        {
-            return new Thread(() =>
-            {
-                int counter = 0;
-                while (Thread.CurrentThread.IsBackground)
-                {
-                    string v = new string(repeater, counter) + new string(' ', length - counter);
-                    Console.Write($"\r{phrase}{v}");
-                    Thread.Sleep(1000);
-                    counter++;
-                    if (counter > length)
-                    {
-                        counter = 0;
-                    }
-                }
-            })
-            { IsBackground = true };
-        }
-
-        private static bool CleanupDirectoryDetailed(DirectoryInfo di)
-        {
-            Stopwatch sw = new Stopwatch();
-
-            Console.Write("Gathering Folder Info");
-            Thread t = ThreadSequenceCurrentLineText("Gathering Folder Info", '.', 6);
-            t.Start();
-
-            sw.Start();
-            List<Tuple<string, long>> files = new List<Tuple<string, long>>();
-            List<string> folders = new List<string>();
-            FindAllFiles(di, ref files, ref folders);
-
-            float totalMB = 0;
-            foreach (Tuple<string, long> file in files)
-            {
-                totalMB += file.Item2;
-            }
-
-            totalMB = totalMB / 1024f / 1024f;
-            t.IsBackground = false;
-            t.Join();
-            Console.Write("\rGathering Folder Info......Complete\r\n");
-            Console.WriteLine($"- Time:{sw.ElapsedMilliseconds / 1000}s - FileCnt:{files.Count} - DirCnt:{folders.Count} - {totalMB:n2}MB");
-
-            sw.Restart();
-            Removing(files, folders);
-
-            Console.Write("\r\n");
-            t = ThreadSequenceCurrentLineText("Removing Remaining Files/Folders", '.', 6);
-            t.Start();
-            try
-            {
-                ExecuteCommand($"del /f/s/q foldername {di.FullName} > nul", true);
-                ExecuteCommand($"rmdir /s/q {di.FullName}", true);
-            }
-            catch
-            {
-                if (di.Exists)
-                {
-                    try
-                    {
-                        Thread.Sleep(100);
-                        ExecuteCommand($"rmdir /s /q {di.FullName}", true, false, false, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
-                        Thread.Sleep(100);
-                    }
-                    catch
-                    {
-                        Console.Write("\r\n");
-                        Console.WriteLine($"Unable to remove Temp directory. \"{di.FullName}\"");
-                        return false;
-                    }
-                }
-            }
-            t.IsBackground = false;
-            t.Join();
-            Console.Write("\rRemoving Remaining Files/Folders......Complete");
-            Console.Write("\r\n");
-            return !di.Exists;
-        }
-
-        private static bool CleanupDirectoryQuick(DirectoryInfo di)
-        {
-            Stopwatch sw = new Stopwatch();
-            sw.Restart();
-
-            Thread t = ThreadSequenceCurrentLineText("Removing Remaining Files/Folders", '.', 6);
-            t.Start();
-            try
-            {
-                ExecuteCommand($"del /f/s/q foldername {di.FullName} > nul", true);
-                Thread.Sleep(100);
-                ExecuteCommand($"rmdir /s/q {di.FullName}", true);
-                Thread.Sleep(100);
-            }
-            catch
-            {
-                if (di.Exists)
-                {
-                    try
-                    {
-                        Thread.Sleep(100);
-                        ExecuteCommand($"rmdir /s/q {di.FullName}", true, false, false, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
-                        Thread.Sleep(100);
-                    }
-                    catch
-                    {
-                        Console.Write("\r\n");
-                        Console.WriteLine($"Unable to remove Temp directory. \"{di.FullName}\"");
-                        return false;
-                    }
-                }
-            }
-            t.IsBackground = false;
-            t.Join();
-            Console.Write("\rRemoving Remaining Files/Folders......Complete");
-            Console.Write($"\r\n - Time:{sw.ElapsedMilliseconds / 1000}s");
-            Console.Write("\r\n");
-            return !di.Exists;
-        }
-
-        private static string CreateStringLimit(string s, int count, bool showEnd)
-        {
-            if (s.Length > count)
-            {
-                if (showEnd)
-                {
-                    s = "..." + s.Substring(s.Length - count + 3, count - 3);
-                }
-                else
-                {
-                    s = s.Substring(0, count - 3) + "...";
-                }
-            }
-
-            return s;
-        }
-
-        private static void FolderProfileCleanup()
-        {
-            char ans;
-
-            Console.WriteLine($"\r\nGathering User Profile information for {Computer}");
-            Console.Write("Working");
-            Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
-            t.Start();
-            string[][][] list = GetProfileInfoDat(Computer, MaxAgeMonths, false, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
-            t.IsBackground = false;
-            t.Join();
-            Console.WriteLine("");
-            Console.WriteLine("-----------------------SID---------------------|--User--|--LastProfileUpdate--");
-            Console.WriteLine("------- Keep");
-            foreach (string[] l in list[0])
-            {
-                Console.WriteLine(string.Join("|", l));
-            }
-            Console.WriteLine("------- Remove");
-            foreach (string[] l in list[1])
-            {
-                Console.WriteLine(string.Join("|", l));
-            }
-            Console.WriteLine("");
-            if (list[1].Length > 0)
-            {
-                if (Automate)
-                {
-                    Individual = false;
-                    Console.WriteLine("-------------------------------------");
-                    Console.WriteLine("Press Esc to stop after current job is complete.");
-                    Console.WriteLine("-------------------------------------\r\n");
-                    foreach (string[] l in list[1])
-                    {
-                        int response = RemoveUserProfile(l[0], l[1], Computer != Environment.MachineName ? Computer : null, Individual);
-                        if (response == -1)
-                        {
-                            Console.WriteLine("Stop Cleaning User Profiles? (Y/n)");
-                            while (Console.KeyAvailable)
-                            {
-                                Console.ReadKey(false);
-                            }
-                            ans = Console.ReadKey(true).KeyChar;
-                            if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
-                            {
-                                Console.WriteLine("\r\nStopping.\r\n");
-                                break;
-                            }
-                        }
-                        else if (response == -2)
-                        {
-                            Console.WriteLine("\r\nProfile Skipped.\r\n");
-                        }
-                        else if (response == 0)
-                        {
-                            Console.WriteLine("\r\nFailed to Remove Profile.\r\n");
-                        }
-                        else if (response == 1)
-                        {
-                            Console.WriteLine("\r\nProfile Removed.\r\n");
-                        }
-                    }
-
-                    Console.WriteLine("User cleanup completed.");
-                }
-                else
-                {
-                    Console.WriteLine($"Ready to remove {list[1].Length} accounts older than {MaxAgeMonths} months? (Y/n).");
-                    while (Console.KeyAvailable)
-                    {
-                        Console.ReadKey(false);
-                    }
-                    ans = Console.ReadKey(true).KeyChar;
-                    if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
-                    {
-                        Console.WriteLine("Individually prompt to remove each profile? (Y/n).");
-                        while (Console.KeyAvailable)
-                        {
-                            Console.ReadKey(false);
-                        }
-                        ans = Console.ReadKey(true).KeyChar;
-                        if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
-                        {
-                            Individual = true;
-                        }
-
-                        Console.Clear();
-
-                        if (!Individual)
-                        {
-                            Console.WriteLine("Press Esc to stop after current job is complete.\r\n");
-                        }
-
-                        foreach (string[] l in list[1])
-                        {
-                            int response = RemoveUserProfile(l[0], l[1], Computer != Environment.MachineName ? Computer : null, Individual);
-                            if (response == -1)
-                            {
-                                Console.WriteLine("Stop Cleaning User Profiles? (Y/n)");
-                                while (Console.KeyAvailable)
-                                {
-                                    Console.ReadKey(false);
-                                }
-                                ans = Console.ReadKey(true).KeyChar;
-                                if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
-                                {
-                                    Console.WriteLine("\r\nStopping.\r\n");
-                                    break;
-                                }
-                            }
-                            else if (response == -2)
-                            {
-                                Console.WriteLine("\r\nProfile Skipped.\r\n");
-                            }
-                            else if (response == 0)
-                            {
-                                Console.WriteLine("\r\nFailed to Remove Profile.\r\n");
-                            }
-                            else if (response == 1)
-                            {
-                                Console.WriteLine("\r\nProfile Removed.\r\n");
-                            }
-                        }
-
-                        Console.WriteLine("User cleanup completed.");
-                    }
-                }
-            }
-            else
-            {
-                Console.WriteLine($"No accounts older than {MaxAgeMonths} months.");
-            }
-        }
-
-        private static void FolderTempPCCleanup()
-        {
-            List<string[]> folderList = new List<string[]>();
-            //Console.Clear();
-            Console.WriteLine($"\r\nGathering temp file list for {Computer}.");
-            Console.Write("Working");
-            Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
-            t.Start();
-            GetExistingFolders(Computer, "", FolderListWin, ref folderList);
-            List<Tuple<string, long>> files = new List<Tuple<string, long>>();
-            List<string> folders = new List<string>();
-            foreach (string[] directory in folderList)
-            {
-                FindAllFiles(new DirectoryInfo(directory[0]), ref files, ref folders, directory[1]);
-            }
-            t.IsBackground = false;
-            t.Join();
-
-            foreach (string s in FolderListWin)
-            {
-                int index = folders.FindIndex(x => x == s);
-                if (index > 0)
-                {
-                    folders.RemoveAt(index);
-                }
-            }
-
-            Removing(files, folders, !Automate);
-        }
-
-        private static void FolderTempUserCleanup()
-        {
-            List<string[]> folderList = new List<string[]>();
-            //Console.Clear();
-            Console.WriteLine($"\r\nGathering User Temp Folder information for {Computer}.");
-            Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
-            t.Start();
-            string[][][] list = GetProfileInfoDat(Computer, MaxAgeMonths, false, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
-            foreach (string[] l in list[0])
-            {
-                GetExistingFolders(Computer, l[1], FolderListUser, ref folderList);
-            }
-
-            foreach (string[] l in list[1])
-            {
-                GetExistingFolders(Computer, l[1], FolderListUser, ref folderList);
-            }
-
-            t.IsBackground = false;
-            t.Join();
-            Console.Write("\r\nCollecting File data in all user locations.\r\n");
-            Console.Write("Press Escape to cancel.\r\n");
-            List<Tuple<string, long>> files = new List<Tuple<string, long>>();
-            List<string> folders = new List<string>();
-            int cnt = 0;
-            string write1 = "";
-            string write2 = "";
-            foreach (string[] directory in folderList)
-            {
-                cnt++;
-                write1 = $"\r({cnt}/{folderList.Count}) {CreateStringLimit($"{directory[0]}\\{directory[1]}", 55, true)}";
-                write2 = "";
-                if (write1.Length < 66)
-                {
-                    write2 = new string(' ', 66 - write1.Length);
-                }
-
-                Console.Write(write1 + write2);
-
-                while (Console.KeyAvailable)
-                {
-                    ConsoleKeyInfo key = Console.ReadKey(false);
-                    if (key.Key == ConsoleKey.Escape)
-                    {
-                        return;
-                    }
-                }
-
-                FindAllFiles(new DirectoryInfo(directory[0]), ref files, ref folders, directory[1]);
-            }
-
-            foreach (string s in FolderListUser)
-            {
-                int index = folders.FindIndex(x => x == s);
-                if (index > 0)
-                {
-                    folders.RemoveAt(index);
-                }
-            }
-            Console.WriteLine("\r\nGathering Info......Complete");
-            Removing(files, folders, !Automate);
-        }
-
         private static void GetExistingFolders(string computer, string user, string[] folderList, ref List<string[]> returnFolderList)
         {
             int cnt = folderList.Length;
@@ -950,430 +1656,6 @@
                     returnFolderList.Add(new string[] { path, files });
                 }
             }
-        }
-
-        private static void Main(string[] args)
-        {
-            ImpersonationContext impersonationContext = null;
-            if (args.Length > 0)
-            {
-                foreach (string arg in args)
-                {
-                    bool valid = true;
-                    if (arg.Contains("-?", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/?", StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        Console.WriteLine("Toolkit Cleanup Help.");
-                        Console.WriteLine("");
-                        Console.WriteLine("Command Line Switches:");
-                        Console.WriteLine("-?");
-                        Console.WriteLine("-Computer:<computername>");
-                        Console.WriteLine("-User:<username>");
-                        Console.WriteLine("-Pass:<password>");
-                        Console.WriteLine("-Clean <cleanType>");
-                        Console.WriteLine("<CleanType>:0 = Main Menu Choices,");
-                        Console.WriteLine("<CleanType>:1 = Full Auto Clean, 2 = Full Prompt Clean, 3 = Old Profile Removal w/Prompt,");
-                        Console.WriteLine("<CleanType>:4 = PC Temp Cleanup, 5 = User Temp Cleanup, 6 = PC & User Temp Cleanup");
-                        Console.WriteLine("<CleanType>:7 = Check & Repair Profile Structure");
-                        Console.WriteLine("");
-                        Console.WriteLine("Example 1: Cleanup all old profiles from current computer.");
-                        Console.WriteLine("ToolkitCleanup.exe -Clean:1");
-                        Console.WriteLine("");
-                        Console.WriteLine("Example 2: Cleanup PC Temp files from remote computer.");
-                        Console.WriteLine("ToolkitCleanup.exe -Computer:computername -Clean:4 -User:myname -Pass:mypass");
-                        Console.WriteLine("");
-                        valid = false;
-                    }
-                    else if (arg.Contains("-Clean", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/Clean", StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        try
-                        {
-                            CleanType = int.Parse(arg.Split(':')[1]);
-                        }
-                        catch
-                        {
-                            Console.WriteLine(" - Invalid Clean parameter.");
-                            valid = false;
-                        }
-                    }
-                    else if (arg.Contains("-Computer", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/Computer", StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        try
-                        {
-                            Computer = arg.Split(':')[1];
-                        }
-                        catch
-                        {
-                            Console.WriteLine(" - Invalid Computer parameter.");
-                            valid = false;
-                        }
-                    }
-                    else if (arg.Contains("-User", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/User", StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        try
-                        {
-                            Creds[0] = arg.Split(':')[1];
-                        }
-                        catch
-                        {
-                            Console.WriteLine(" - Invalid Username parameter.");
-                            valid = false;
-                        }
-                    }
-                    else if (arg.Contains("-Pass", StringComparison.CurrentCultureIgnoreCase) || arg.Contains("/Pass", StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        try
-                        {
-                            Creds[1] = Crypto.EncryptStringAES(arg.Split(':')[1], Environment.UserName);
-                        }
-                        catch
-                        {
-                            Console.WriteLine(" - Invalid Password parameter.");
-                            valid = false;
-                        }
-                    }
-
-                    if (!valid)
-                    {
-                        Environment.Exit(0);
-                    }
-                }
-            }
-
-            char ans;
-            Console.WriteLine("Welcome to the Computer Toolkit Cleanup.");
-            if (Computer == null)
-            {
-                Console.WriteLine("Are you cleaning THIS computer? (Y/n).");
-                while (Console.KeyAvailable)
-                {
-                    Console.ReadKey(false);
-                }
-                ans = Console.ReadKey(true).KeyChar;
-                if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
-                {
-                    Computer = Environment.MachineName;
-                }
-                else
-                {
-                    Console.WriteLine("Please enter the computer name");
-                    Computer = Console.ReadLine();
-                }
-            }
-
-            if (Computer != Environment.MachineName && !string.IsNullOrWhiteSpace(Creds[0]) && !string.IsNullOrWhiteSpace(Creds[1]))
-            {
-                Console.WriteLine("Use alternate credentials? (Y/n).");
-                while (Console.KeyAvailable)
-                {
-                    Console.ReadKey(false);
-                }
-
-                ans = Console.ReadKey(true).KeyChar;
-                if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
-                {
-                    Creds = CredentialPrompt();
-                    Console.WriteLine("");
-                    impersonationContext = new ImpersonationContext(Environment.UserDomainName, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
-                    impersonationContext?.Enter();
-                    ExecuteCommand($"Net Use \\\\{Computer}\\c$ /user:\"{ Environment.UserDomainName}\\{Creds[0]}\" \"{Crypto.DecryptStringAES(Creds[1], Environment.UserName)}\"", true);
-                }
-                else
-                {
-                    ExecuteCommand($"Net Use \\\\{Computer}\\c$", true);
-                }
-            }
-
-            if (CleanType == 0)
-            {
-                MenuLoad();
-            }
-            else if (CleanType == 1)
-            {
-                Automate = true;
-                FolderTempPCCleanup();
-                FolderProfileCleanup();
-                FolderTempUserCleanup();
-            }
-            else if (CleanType == 2)
-            {
-                Automate = false;
-                FolderTempPCCleanup();
-                FolderProfileCleanup();
-                FolderTempUserCleanup();
-            }
-            else if (CleanType == 3)
-            {
-                Automate = false;
-                FolderProfileCleanup();
-            }
-            else if (CleanType == 4)
-            {
-                Automate = false;
-                FolderTempPCCleanup();
-            }
-            else if (CleanType == 5)
-            {
-                Automate = false;
-                FolderTempUserCleanup();
-            }
-            else if (CleanType == 6)
-            {
-                Automate = false;
-                FolderTempPCCleanup();
-                FolderTempUserCleanup();
-            }
-            else if (CleanType == 7)
-            {
-                Automate = true;
-                RepairUserDirectory();
-            }
-
-            DirectoryInfo tempFolder = new DirectoryInfo(@$"\\{Computer}\c$\Users\Temp");
-            if (tempFolder.Exists && CleanType != 7)
-            {
-                DirectoryInfo[] tdi = tempFolder.GetDirectories("*", SearchOption.TopDirectoryOnly);
-                if (tdi.Length > 0)
-                {
-                    if (CleanType == 0)
-                    {
-                        Console.WriteLine("");
-                        Console.WriteLine("Remaining Temp User Files found. Cleanup Now? (Y/n)");
-                        while (Console.KeyAvailable)
-                        {
-                            Console.ReadKey(false);
-                        }
-
-                        ans = Console.ReadKey(true).KeyChar;
-                    }
-                    else
-                    {
-                        ans = 'y';
-                    }
-
-                    if (string.Equals(ans.ToString(), "y", StringComparison.OrdinalIgnoreCase) || char.IsWhiteSpace(ans))
-                    {
-                        bool test = CleanupDirectoryQuick(tempFolder);
-                        if (!test)
-                        {
-                            Console.WriteLine($"Unable to remove all files in {tempFolder.FullName}.");
-                        }
-                    }
-                }
-                else
-                {
-                    try
-                    {
-                        tempFolder.Delete();
-                    }
-                    catch
-                    {
-                    }
-                }
-            }
-
-            if (Computer != Environment.MachineName && !string.IsNullOrWhiteSpace(Creds[0]) && !string.IsNullOrWhiteSpace(Creds[1]))
-            {
-                ExecuteCommand(@$"Net Use \\{Computer}\c$ /delete", true);
-                impersonationContext?.Leave();
-            }
-
-            if (CleanType != 7)
-            {
-                Console.WriteLine($"\r\nCleaned {TotalMB:n2}MB.");
-            }
-
-            Console.WriteLine("\r\nRestart is recommended after most cleanings.");
-            Console.WriteLine("Press any key to close.");
-            while (Console.KeyAvailable)
-            {
-                Console.ReadKey(false);
-            }
-
-            Console.ReadKey();
-        }
-
-        private static void MenuLoad()
-        {
-            char ans;
-            int fixIssues = 0;
-
-            Console.Clear();
-            Console.WriteLine($"Toolkit connected to {Computer} as {(string.IsNullOrWhiteSpace(Creds[0]) ? Environment.UserName : Creds[0])}.");
-            Console.WriteLine("Please choose an option to clean.");
-            Console.WriteLine("");
-            Console.WriteLine("1) - Full cleanup - All options. (default)");
-            Console.WriteLine("2) - Cleanup App/Windows Temporary files.");
-            Console.WriteLine("3) - Remove old User Profiles.");
-            Console.WriteLine("4) - Cleanup User Temporary files.");
-            Console.WriteLine("");
-            Console.WriteLine("5) - Repair User Directories/Registry Keys.");
-            Console.WriteLine("");
-            Console.WriteLine("6) Modify settings.");
-            Console.WriteLine("0) Exit.");
-            Console.Write(":");
-            while (Console.KeyAvailable)
-            {
-                Console.ReadKey(false);
-            }
-
-            ans = Console.ReadKey(false).KeyChar;
-            Console.Clear();
-            if (string.Equals(ans.ToString(), "1") || char.IsWhiteSpace(ans))
-            {
-                FolderTempPCCleanup();
-                FolderProfileCleanup();
-                FolderTempUserCleanup();
-            }
-            else if (string.Equals(ans.ToString(), "2"))
-            {
-                FolderTempPCCleanup();
-            }
-            else if (string.Equals(ans.ToString(), "3"))
-            {
-                FolderProfileCleanup();
-            }
-            else if (string.Equals(ans.ToString(), "4"))
-            {
-                FolderTempUserCleanup();
-            }
-            else if (string.Equals(ans.ToString(), "5"))
-            {
-                fixIssues = RepairUserDirectory();
-            }
-            else if (string.Equals(ans.ToString(), "0"))
-            {
-                return;
-            }
-            else if (string.Equals(ans.ToString(), "6"))
-            {
-                MenuSettings();
-            }
-
-            if (ans.ToString() == "5")
-            {
-                Console.WriteLine($"\r\nRepair Complete. Attempted to fix {fixIssues} issues.");
-                Console.WriteLine("Press Any Key to return to menu.");
-                while (Console.KeyAvailable)
-                {
-                    Console.ReadKey(false);
-                }
-
-                Console.ReadKey(true);
-            }
-            else if (!string.Equals(ans.ToString(), "6"))
-            {
-                Console.WriteLine($"\r\nCleaning Complete. Total cleaned this session: {TotalMB:n2}MB");
-                Console.WriteLine("Press Any Key to return to menu.");
-                while (Console.KeyAvailable)
-                {
-                    Console.ReadKey(false);
-                }
-
-                Console.ReadKey(true);
-            }
-
-            MenuLoad();
-        }
-
-        private static void MenuSettings()
-        {
-            char ans;
-
-            Console.Clear();
-            Console.WriteLine($"User Profile max age is set to {MaxAgeMonths} months.");
-            Console.WriteLine($"File Delete thread count set to {TotalFileThreads} threads.");
-            Console.WriteLine($"Folder Delete thread count set to {TotalFolderThreads} threads.");
-            Console.WriteLine($"Automation - Cleaning WILL {(Automate ? "NOT " : "")}prompt for input.");
-            Console.WriteLine("");
-            Console.WriteLine("1) Change Max Profile Age.");
-            Console.WriteLine("2) Change File Threads.");
-            Console.WriteLine("3) Change Folder Threads.");
-            Console.WriteLine("4) Change automation setting.");
-            Console.WriteLine("5) Modify locations to clean.");
-            Console.WriteLine("");
-            Console.WriteLine("0) Return (default).");
-            Console.Write(":");
-            while (Console.KeyAvailable)
-            {
-                Console.ReadKey(false);
-            }
-
-            ans = Console.ReadKey(false).KeyChar;
-            if (string.Equals(ans.ToString(), "0") || char.IsWhiteSpace(ans))
-            {
-                return;
-            }
-            else if (string.Equals(ans.ToString(), "1"))
-            {
-                Console.Write("\r\nSet the max age of User Profiles to keep: ");
-                while (Console.KeyAvailable)
-                {
-                    Console.ReadKey(false);
-                }
-
-                string threads = Console.ReadLine();
-                if (int.TryParse(threads, out int newAge))
-                {
-                    MaxAgeMonths = newAge;
-                    Console.WriteLine($"\r\nMax age set to {MaxAgeMonths} months.");
-                    Thread.Sleep(1200);
-                }
-                else
-                {
-                    Console.WriteLine($"\r\nNumber was invalid. Continuing with current max age. ({MaxAgeMonths}) months.");
-                    Thread.Sleep(1200);
-                }
-            }
-            else if (string.Equals(ans.ToString(), "2"))
-            {
-                Console.Write($"Set the number of File Delete threads ({TotalFileThreads}): ");
-                while (Console.KeyAvailable)
-                {
-                    Console.ReadKey(false);
-                }
-                string threads = Console.ReadLine();
-                if (int.TryParse(threads, out int newThreads))
-                {
-                    TotalFileThreads = newThreads;
-                    Console.WriteLine($"\r\nFile thread count set to {TotalFileThreads}.");
-                    Thread.Sleep(1200);
-                }
-                else
-                {
-                    Console.WriteLine($"\r\nNumber was invalid. Continuing with default File thread count. ({TotalFileThreads})");
-                    Thread.Sleep(1200);
-                }
-            }
-            else if (string.Equals(ans.ToString(), "3"))
-            {
-                Console.Write($"Set the number of Folder Delete threads ({TotalFolderThreads}): ");
-                while (Console.KeyAvailable)
-                {
-                    Console.ReadKey(false);
-                }
-
-                string threads = Console.ReadLine();
-                if (int.TryParse(threads, out int newThreads))
-                {
-                    TotalFolderThreads = newThreads;
-                    Console.WriteLine($"\r\nFolder thread count set to {TotalFolderThreads}.");
-                    Thread.Sleep(1200);
-                }
-                else
-                {
-                    Console.WriteLine($"\r\nNumber was invalid. Continuing with default Folder thread count. ({TotalFolderThreads})");
-                    Thread.Sleep(1200);
-                }
-            }
-            else if (string.Equals(ans.ToString(), "4"))
-            {
-                Automate = !Automate;
-            }
-            else if (string.Equals(ans.ToString(), "5"))
-            {
-            }
-
-            MenuSettings();
         }
 
         private static void Removing(List<Tuple<string, long>> files, List<string> folders, bool ask = false)
@@ -1504,6 +1786,65 @@
             Console.WriteLine("");
         }
 
+        private static long TryDeleteFile(string file, long sizeReturn)
+        {
+            if (string.IsNullOrWhiteSpace(file) || sizeReturn < 0)
+            {
+                return -1;
+            }
+
+            bool test = NativeMethods.DeleteFile(file);
+            if (!test)
+            {
+                try
+                {
+                    File.Delete(file);
+                }
+                catch
+                {
+                    return -1;
+                }
+            }
+            return sizeReturn;
+        }
+
+        #endregion File/Folder Operations
+
+        #region Other
+
+        public static void ExecuteCommand(string command, bool wait = false, bool showWindow = false, bool interactable = false, string user = null, string pass = null)
+        {
+            ProcessStartInfo startInfo = new ProcessStartInfo()
+            {
+                FileName = "cmd.exe",
+                Arguments = $"{(showWindow && interactable ? "/k" : "/c")} {command}",
+                CreateNoWindow = !showWindow,
+                UseShellExecute = false
+            };
+
+            if (!string.IsNullOrWhiteSpace(user) && !string.IsNullOrWhiteSpace(pass))
+            {
+                startInfo.UserName = user;
+                startInfo.PasswordInClearText = pass;
+                startInfo.Domain = Environment.UserDomainName;
+            }
+
+            using Process process = new Process { StartInfo = startInfo };
+
+            try
+            {
+                process.Start();
+                if (wait)
+                {
+                    process.WaitForExit();
+                }
+            }
+            catch
+            {
+                throw;
+            }
+        }
+
         private static int RepairUserDirectory()
         {
             List<string[]> folderList = new List<string[]>();
@@ -1597,19 +1938,19 @@
                         if (kvp.Key.Length <= 3)
                         {
                             Console.WriteLine($"Missing User Folder for key: {kvp.Value} ({allUserKeys.FirstOrDefault(o => o.Key == kvp.Value).Value})");
-                            //Console.WriteLine($"\tKey will be removed.");
                         }
                         else if (string.IsNullOrEmpty(kvp.Value))
                         {
                             Console.WriteLine($"Missing Registry key for folder: {kvp.Key}");
-                            //Console.WriteLine($"\tFolder will be moved.");
                         }
                     }
+
                     Console.WriteLine("\r\nFix all issues? (Y/n)");
                     while (Console.KeyAvailable)
                     {
                         Console.ReadKey(false);
                     }
+
                     ans = Console.ReadKey(true).KeyChar;
                     Console.WriteLine("");
                 }
@@ -1657,26 +1998,6 @@
             return issues.Count;
         }
 
-        private static long TryDeleteFile(string file, long sizeReturn)
-        {
-            if (string.IsNullOrWhiteSpace(file) || sizeReturn < 0)
-            {
-                return -1;
-            }
-
-            bool test = NativeMethods.DeleteFile(file);
-            if (!test)
-            {
-                try
-                {
-                    File.Delete(file);
-                }
-                catch
-                {
-                    return -1;
-                }
-            }
-            return sizeReturn;
-        }
+        #endregion Other
     }
 }

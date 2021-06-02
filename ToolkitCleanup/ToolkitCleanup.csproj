@@ -73,6 +73,9 @@
       <Private>True</Private>
       <Private>True</Private>
     </Reference>
+    <Reference Include="PCA_ConsoleWriter">
+      <HintPath>..\..\PCA_ConsoleWriter\PCA_ConsoleWriter\bin\Release\PCA_ConsoleWriter.dll</HintPath>
+    </Reference>
     <Reference Include="PCA_RegistryCommands">
       <HintPath>..\..\PCA_RegistryCommands\RegistryCommands\bin\Release\PCA_RegistryCommands.dll</HintPath>
     </Reference>
@@ -217,6 +220,7 @@
     <Compile Include="Modified Assistant Classes\StringExtensions.cs" />
     <Compile Include="Modified Assistant Classes\NativeMethods.cs" />
     <Compile Include="Modified Assistant Classes\NetworkConnection.cs" />
+    <Compile Include="ProfileCompareType.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
