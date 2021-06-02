@@ -1,4 +1,6 @@
-# ToolkitCleanup
+ # ToolkitCleanup
+![Icon](https://github.com/cloudd901/ToolkitCleanup/blob/master/ToolkitCleanup/logo.ico)
+
 Toolkit Cleanup script was made as part of a Computer Toolkit application. The script itself is standalone and can be used on any Windows 7, 8, or 10 device.
 
  - Designed to scour all corners of multi-user workstations.
