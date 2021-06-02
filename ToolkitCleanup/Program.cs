@@ -306,8 +306,6 @@
                     .WriteLineAnimated("Use alternate credentials? (y/n)", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
                     .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
 
-                //Console.WriteLine("\r\nUse alternate credentials? (y/n).");
-                //Console.Write("(y):");
                 while (Console.KeyAvailable)
                 {
                     Console.ReadKey(false);
@@ -385,9 +383,6 @@
                             .WriteLineAnimated("Remaining Temp User Files found. Cleanup Now? (y/n)", 10, ConsoleColor.Yellow, ConsoleColor.Blue)
                             .WriteAnimated("(y)", 0, ConsoleColor.DarkGray).WriteAnimated(":", 0);
 
-                        //Console.WriteLine("");
-                        //Console.WriteLine("Remaining Temp User Files found. Cleanup Now? (y/n)");
-                        //Console.Write("(y):");
                         while (Console.KeyAvailable)
                         {
                             Console.ReadKey(false);
@@ -442,8 +437,6 @@
                 .WriteAnimated("Any Key", 10, ConsoleColor.White, ConsoleColor.Blue)
                 .WriteLineAnimated(" to exit.", 10, ConsoleColor.Green, ConsoleColor.Blue);
 
-            //Console.WriteLine("\r\nRestart is recommended after most cleanings.");
-            //Console.WriteLine("Press any key to close.");
             while (Console.KeyAvailable)
             {
                 Console.ReadKey(false);
@@ -879,10 +872,14 @@
             ConsoleColor mainColor = ConsoleColor.White;
             ConsoleColor titlecolor = ConsoleColor.Yellow;
 
-            cw.WriteAnimated(appname, animate ? 70 : 0, titlecolor, ConsoleColor.Black, AnimationType.GarbledRandom)
+            int padd = ((Console.BufferWidth - 1) / 2) + ((appname.Length + byname.Length) / 2) - (byname.Length);
+
+            cw.WriteAnimated(appname.PadLeft(padd), animate ? 70 : 0, titlecolor, ConsoleColor.Black, AnimationType.GarbledRandom)
                 .WriteLineAnimated(byname, animate ? 50 : 0, mainColor, ConsoleColor.Black, AnimationType.Linear);
 
-            cw.WriteAnimated("Version - ", animate ? 80 : 0, titlecolor, ConsoleColor.Black, AnimationType.GarbledRandom)
+            padd = ((Console.BufferWidth - 1) / 2) + (("Version - ".Length + v.Length) / 2) - (v.Length);
+
+            cw.WriteAnimated("Version - ".PadLeft(padd), animate ? 80 : 0, titlecolor, ConsoleColor.Black, AnimationType.GarbledRandom)
                 .WriteLineAnimated(v, animate ? 60 : 0, mainColor, ConsoleColor.Black, AnimationType.Linear);
 
             Console.WriteLine("");
