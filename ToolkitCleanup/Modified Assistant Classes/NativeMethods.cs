@@ -1,11 +1,11 @@
-﻿namespace ToolkitCleanup
-{
-    using System;
-    using System.Runtime.ConstrainedExecution;
-    using System.Runtime.InteropServices;
-    using System.Security;
-    using static ToolkitCleanup.ImpersonationContext;
+﻿using System;
+using System.Runtime.ConstrainedExecution;
+using System.Runtime.InteropServices;
+using System.Security;
+using static ToolkitCleanup.ImpersonationContext;
 
+namespace ToolkitCleanup
+{
     internal static class NativeMethods
     {
         [DllImport("kernel32.dll")]

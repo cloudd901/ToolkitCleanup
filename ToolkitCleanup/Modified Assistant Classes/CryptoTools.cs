@@ -1,11 +1,11 @@
-﻿namespace ToolkitCleanup
-{
-    using System;
-    using System.IO;
-    using System.Linq;
-    using System.Security.Cryptography;
-    using System.Text;
+﻿using System;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
+namespace ToolkitCleanup
+{
     public static class Crypto
     {
         // Salt can be set to anything.

@@ -1,16 +1,16 @@
-﻿namespace ToolkitCleanup
+﻿using Microsoft.Win32.SafeHandles;
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Security;
+using System.Security.Permissions;
+using System.Security.Principal;
+
+//https://stackoverflow.com/questions/295538/how-to-provide-user-name-and-password-when-connecting-to-a-network-share/1197430#1197430
+//Pavel Kovalev
+
+namespace ToolkitCleanup
 {
-    using Microsoft.Win32.SafeHandles;
-    using System;
-    using System.ComponentModel;
-    using System.Runtime.InteropServices;
-    using System.Security;
-    using System.Security.Permissions;
-    using System.Security.Principal;
-
-    //https://stackoverflow.com/questions/295538/how-to-provide-user-name-and-password-when-connecting-to-a-network-share/1197430#1197430
-    //Pavel Kovalev
-
     public static class ImpersonationWrapper
     {
         [PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
