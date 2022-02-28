@@ -922,17 +922,11 @@ namespace ToolkitCleanup
 
             cw.WriteLineAnimated(nameText, animate ? 30 : 0, mainColor, ConsoleColor.Black, AnimationType.GarbledRandomWhiteSpace);
 
-            //cw.WriteAnimated(appname.PadLeft(padd).PadRight(padd2), animate ? 50 : 0, titlecolor, ConsoleColor.Black, AnimationType.Linear)
-            //    .WriteLineAnimated(byname, animate ? 50 : 0, mainColor, ConsoleColor.Black, AnimationType.Linear);
-
             padd = ((Console.BufferWidth - 1) / 2) + (("Version - ".Length + v.Length) / 2) - (v.Length);
             padd2 = ((Console.BufferWidth - 1) / 2) + ((v.Length + v.Length) / 2) - (v.Length) - 2;
             string versionText = "Version - ".PadLeft(padd) + v.PadRight(padd2);
 
             cw.WriteLineAnimated(versionText, animate ? 30 : 0, titlecolor, ConsoleColor.Black, AnimationType.GarbledRandomWhiteSpace);
-
-            //cw.WriteAnimated("Version - ".PadLeft(padd), animate ? 50 : 0, titlecolor, ConsoleColor.Black, AnimationType.GarbledRandomWhiteSpace)
-            //    .WriteLineAnimated(v.PadRight(padd2), animate ? 50 : 0, mainColor, ConsoleColor.Black, AnimationType.GarbledRandomWhiteSpace);
 
             Console.WriteLine("");
         }
@@ -1287,6 +1281,7 @@ namespace ToolkitCleanup
             Thread t = ThreadSequenceCurrentLineText("Working", '.', 6);
             t.Start();
             string[][][] list = GetProfileInfoDat(Computer, MaxAgeMonths, ProfileCompare, Creds[0], Crypto.DecryptStringAES(Creds[1], Environment.UserName));
+
             foreach (string[] l in list[0])
             {
                 GetExistingFolders(Computer, l[1], FolderListUser, ref folderList);
@@ -1473,7 +1468,6 @@ namespace ToolkitCleanup
         public static string[][][] GetProfileInfoDat(string nameOrAddress, int monthsOld = 2, ProfileCompareType profileCompare = ProfileCompareType.NTUserWithDesktopAndAPPData, string username = "", string password = "")
         {
             string[][][] profiles = new string[2][][];
-
             ConnectionOptions options = new ConnectionOptions();
             if (!string.Equals(Environment.MachineName, nameOrAddress, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
             {
@@ -1487,31 +1481,34 @@ namespace ToolkitCleanup
             {
                 scope.Connect();
             }
-            catch (ManagementException ex)
+            catch (Exception ex)
             {
-                if (ex.Message.Contains("Access denied", StringComparison.CurrentCultureIgnoreCase))
+                if (ex is UnauthorizedAccessException || ex is ManagementException)
                 {
-                    StopSequenceThread = true;
-                    Console.Clear();
-                    ConsoleWriter cw = new ConsoleWriter();
-                    cw.WriteLineAnimated("We have ran into a permissions error.", 30)
-                        .WriteLineAnimated("Please relaunch this script with necessary credentials.", 30)
-                        .WriteLineAnimated("", 0)
-                        .WriteLineAnimated("Press any key to exit.", 30);
-                    Console.ReadKey();
-                    Environment.Exit(0);
+                    if (ex.Message.Contains("denied", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        StopSequenceThread = true;
+                        Console.Clear();
+                        ConsoleWriter cw = new ConsoleWriter();
+                        cw.WriteLineAnimated("We have ran into a permissions error.", 30)
+                            .WriteLineAnimated("Please relaunch this script with necessary credentials.", 30)
+                            .WriteLineAnimated("", 0)
+                            .WriteLineAnimated("Press any key to exit.", 30);
+                        Console.ReadKey();
+                        Environment.Exit(0);
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
                 else
                 {
                     throw;
                 }
             }
-            catch
-            {
-                throw;
-            }
 
-            ObjectQuery query = new ObjectQuery($"SELECT * FROM Win32_UserProfile Where Special = false And Not LocalPath Like \"%Admin%\" And Not LocalPath Like \"%{username}%\"");
+            ObjectQuery query = new ObjectQuery($"SELECT * FROM Win32_UserProfile Where Special = false And Not LocalPath Like \"%Admin%\"{(string.IsNullOrWhiteSpace(username) ? " And Not LocalPath Like \"%{username}%\"" : "")}");
             using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
             if (searcher != null)
             {
@@ -1585,6 +1582,7 @@ namespace ToolkitCleanup
                     }
                     catch
                     {
+                        //Ignore
                     }
 
                     profiles[0] = l1.ToArray();
