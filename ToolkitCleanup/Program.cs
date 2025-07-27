@@ -1508,7 +1508,7 @@ namespace ToolkitCleanup
                 }
             }
 
-            ObjectQuery query = new ObjectQuery($"SELECT * FROM Win32_UserProfile Where Special = false And Not LocalPath Like \"%Admin%\"{(string.IsNullOrWhiteSpace(username) ? " And Not LocalPath Like \"%{username}%\"" : "")}");
+            ObjectQuery query = new ObjectQuery($"SELECT * FROM Win32_UserProfile Where Special = false And Not LocalPath Like \"%Admin%\"{(!string.IsNullOrWhiteSpace(username) ? " And Not LocalPath Like \"%{username}%\"" : "")}");
             using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
             if (searcher != null)
             {
