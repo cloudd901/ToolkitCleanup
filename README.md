@@ -13,7 +13,7 @@ Command-Line parameters:
     -Computer:<computername>
     -User:<username>
     -Pass:<password>
-    -Clean <cleanType>
+    -Clean:<cleanType>
     <CleanType>:0 = Main Menu Choices,
     <CleanType>:1 = Full Auto Clean
     <CleanType>:2 = Full Prompt Clean
