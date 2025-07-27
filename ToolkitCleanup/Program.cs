@@ -1490,7 +1490,7 @@ namespace ToolkitCleanup
                         StopSequenceThread = true;
                         Console.Clear();
                         ConsoleWriter cw = new ConsoleWriter();
-                        cw.WriteLineAnimated("We have ran into a permissions error.", 30)
+                        cw.WriteLineAnimated("We have run into a permissions error.", 30)
                             .WriteLineAnimated("Please relaunch this script with necessary credentials.", 30)
                             .WriteLineAnimated("", 0)
                             .WriteLineAnimated("Press any key to exit.", 30);
