@@ -25,7 +25,7 @@ namespace ToolkitCleanup
             null
         };
 
-        public static string[] FolderListUser = new string[31]
+        public static string[] FolderListUser = new string[34]
         {
             @"C:\Users\<USERNAME>\AppData\Roaming\Microsoft\Teams\tmp\*",
             @"C:\Users\<USERNAME>\AppData\Roaming\Microsoft\Teams\blob_storage\*",
@@ -55,6 +55,9 @@ namespace ToolkitCleanup
             @"C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\AC\*",
             @"C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\LocalCache\*",
             @"C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\AppData\User\Default\CacheStorage\*",
+            @"C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\Cache\*",
+            @"C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\Cookies\*",
+            @"C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\History\*",
             @"C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\Default\Cache\*",
             @"C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\Default\GPUCache\*",
             @"C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\ShaderCache\*"
