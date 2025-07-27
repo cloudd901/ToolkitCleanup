@@ -65,6 +65,8 @@ Removes files from the following folders:
     "C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\Default\Cache\*"
     "C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\Default\GPUCache\*"
     "C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\ShaderCache\*"
+    "C:\Users\<USERNAME>\AppData\Local\CrashDumps\*"
+    "C:\Users\<USERNAME>\AppData\Local\Microsoft\Windows\WER\*"
 
     "C:\temp\*"
     "C:\Windows\Downloaded Program Files\*"
@@ -82,3 +84,9 @@ Removes files from the following folders:
     "C:\Windows\SoftwareDistribution\Download\*"
     "C:\Windows\SoftwareDistribution\EventCache.v2\*"
     "C:\Windows\SoftwareDistribution\PostRebootEventCache.V2\*"
+    "C:\Windows\Minidump\*"
+    "C:\Windows\Memory.dmp"
+    "C:\Windows\Logs\CBS\*"
+    "C:\Windows\Logs\DISM\*"
+    "C:\Windows\Panther\*"
+    "C:\Windows\System32\LogFiles\*"
