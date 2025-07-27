@@ -108,7 +108,7 @@ namespace ToolkitCleanup
                         Console.WriteLine("-Computer:<computername>");
                         Console.WriteLine("-User:<username>");
                         Console.WriteLine("-Pass:<password>");
-                        Console.WriteLine("-Clean <cleanType>");
+                        Console.WriteLine("-Clean:<cleanType>");
                         Console.WriteLine("<CleanType>:0 = Main Menu Choices,");
                         Console.WriteLine("<CleanType>:1 = Full Auto Clean, 2 = Full Prompt Clean, 3 = Old Profile Removal w/Prompt,");
                         Console.WriteLine("<CleanType>:4 = PC Temp Cleanup, 5 = User Temp Cleanup, 6 = PC & User Temp Cleanup");
