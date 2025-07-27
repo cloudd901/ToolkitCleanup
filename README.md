@@ -1,7 +1,7 @@
  # ToolkitCleanup
 ![Icon](https://github.com/cloudd901/ToolkitCleanup/blob/master/ToolkitCleanup/logo.ico)
 
-Toolkit Cleanup script was made as part of a Computer Toolkit application. The script itself is standalone and can be used on any Windows 7, 8, or 10 device.
+Toolkit Cleanup script was made as part of a Computer Toolkit application. The script itself is standalone and can be used on any Windows 7, 8, 10, or 11 device.
 
  - Designed to scour all corners of multi-user workstations.
  - Can compare dates and remove old account profiles.
@@ -59,9 +59,14 @@ Removes files from the following folders:
     "C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\AC\*"
     "C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\LocalCache\*"
     "C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\AppData\User\Default\CacheStorage\*"
+    "C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\Cache\*"
+    "C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\Cookies\*"
+    "C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\History\*"
     "C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\Default\Cache\*"
     "C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\Default\GPUCache\*"
     "C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\ShaderCache\*"
+    "C:\Users\<USERNAME>\AppData\Local\CrashDumps\*"
+    "C:\Users\<USERNAME>\AppData\Local\Microsoft\Windows\WER\*"
 
     "C:\temp\*"
     "C:\Windows\Downloaded Program Files\*"
@@ -79,3 +84,9 @@ Removes files from the following folders:
     "C:\Windows\SoftwareDistribution\Download\*"
     "C:\Windows\SoftwareDistribution\EventCache.v2\*"
     "C:\Windows\SoftwareDistribution\PostRebootEventCache.V2\*"
+    "C:\Windows\Minidump\*"
+    "C:\Windows\Memory.dmp"
+    "C:\Windows\Logs\CBS\*"
+    "C:\Windows\Logs\DISM\*"
+    "C:\Windows\Panther\*"
+    "C:\Windows\System32\LogFiles\*"

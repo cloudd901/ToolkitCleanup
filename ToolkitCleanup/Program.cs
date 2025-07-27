@@ -25,7 +25,7 @@ namespace ToolkitCleanup
             null
         };
 
-        public static string[] FolderListUser = new string[31]
+        public static string[] FolderListUser = new string[36]
         {
             @"C:\Users\<USERNAME>\AppData\Roaming\Microsoft\Teams\tmp\*",
             @"C:\Users\<USERNAME>\AppData\Roaming\Microsoft\Teams\blob_storage\*",
@@ -55,12 +55,17 @@ namespace ToolkitCleanup
             @"C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\AC\*",
             @"C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\LocalCache\*",
             @"C:\Users\<USERNAME>\AppData\Local\Packages\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\AppData\User\Default\CacheStorage\*",
+            @"C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\Cache\*",
+            @"C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\Cookies\*",
+            @"C:\Users\<USERNAME>\AppData\Local\Microsoft\Edge\User Data\Default\History\*",
             @"C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\Default\Cache\*",
             @"C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\Default\GPUCache\*",
-            @"C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\ShaderCache\*"
+            @"C:\Users\<USERNAME>\AppData\Local\Chromium\User Data\ShaderCache\*",
+            @"C:\Users\<USERNAME>\AppData\Local\CrashDumps\*",
+            @"C:\Users\<USERNAME>\AppData\Local\Microsoft\Windows\WER\*"
         };
 
-        public static string[] FolderListWin = new string[16]
+        public static string[] FolderListWin = new string[22]
         {
             @"C:\temp\*",
             @"C:\Windows\Downloaded Program Files\*",
@@ -78,6 +83,12 @@ namespace ToolkitCleanup
             @"C:\Windows\SoftwareDistribution\Download\*",
             @"C:\Windows\SoftwareDistribution\EventCache.v2\*",
             @"C:\Windows\SoftwareDistribution\PostRebootEventCache.V2\*",
+            @"C:\Windows\Minidump\*",
+            @"C:\Windows\Memory.dmp",
+            @"C:\Windows\Logs\CBS\*",
+            @"C:\Windows\Logs\DISM\*",
+            @"C:\Windows\Panther\*",
+            @"C:\Windows\System32\LogFiles\*",
         };
 
         public static bool Individual;
